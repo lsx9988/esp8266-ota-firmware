@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>多设备智能开关</title>
     <style>
-        /* ... 样式部分保持原样，为了精简此处省略，你可以直接复制之前的完整样式 ... */
-        /* 但为保证完整，以下是完整样式（和之前相同） */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; }
@@ -99,14 +97,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js">
 </script>
 <script>
-    // ============================================================
-    // 自动选择 MQTT 端口：根据页面协议
-    // ============================================================
+    // ====== 自动选择 MQTT 端口 ======
     const isHttps = window.location.protocol === 'https:';
     const BROKER = "broker-cn.emqx.io";
-    const PORT = isHttps ? 8084 : 8083;   // 加密端口 8084，非加密 8083
-    const USE_SSL = isHttps;              // https 页面必须使用加密 WebSocket
-
+    const PORT = isHttps ? 8084 : 8083;
     const CLIENT_ID = "web_multi_" + Math.random().toString(16).substr(2, 6);
 
     let devices = [];
@@ -217,8 +211,8 @@
                 console.error(err);
             }
         };
-        if (USE_SSL) {
-            connectOptions.useSSL = true;  // 使用加密连接
+        if (isHttps) {
+            connectOptions.useSSL = true;
         }
         client.connect(connectOptions);
 
@@ -288,12 +282,13 @@
     }
 
     // ============================================================
-    // ====== 检查更新 ======
+    // ====== 检查更新：跳转到 GitHub Pages 在线版本 ======
     // ============================================================
 
     function checkUpdate() {
-        showToast('📥 请前往网盘查看最新版本');
-        window.open('https://share.feijipan.com/s/II7kn5Ae', '_blank');
+        showToast('📥 正在打开最新版本...');
+        // 直接打开 GitHub Pages 上的在线版本
+        window.open('https://lsx9988.github.io/esp8266-ota-firmware/web/index.html', '_blank');
     }
 
     // ============================================================
