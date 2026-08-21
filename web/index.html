@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>多设备智能开关</title>
     <style>
+        /* ... 样式部分保持原样，为了精简此处省略，你可以直接复制之前的完整样式 ... */
+        /* 但为保证完整，以下是完整样式（和之前相同） */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; }
@@ -97,9 +99,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js">
 </script>
 <script>
-    // ====== MQTT 全局配置 ======
+    // ============================================================
+    // 自动选择 MQTT 端口：根据页面协议
+    // ============================================================
+    const isHttps = window.location.protocol === 'https:';
     const BROKER = "broker-cn.emqx.io";
-    const PORT = 8083;
+    const PORT = isHttps ? 8084 : 8083;   // 加密端口 8084，非加密 8083
+    const USE_SSL = isHttps;              // https 页面必须使用加密 WebSocket
+
     const CLIENT_ID = "web_multi_" + Math.random().toString(16).substr(2, 6);
 
     let devices = [];
@@ -200,7 +207,7 @@
     // ====== MQTT 连接 ======
     function connectMQTT() {
         client = new Paho.MQTT.Client(BROKER, PORT, CLIENT_ID);
-        client.connect({
+        const connectOptions = {
             onSuccess: () => {
                 showToast('✅ MQTT 连接成功');
                 devices.forEach(dev => subscribeDevice(dev));
@@ -209,7 +216,11 @@
                 showToast('❌ MQTT 连接失败，请检查网络');
                 console.error(err);
             }
-        });
+        };
+        if (USE_SSL) {
+            connectOptions.useSSL = true;  // 使用加密连接
+        }
+        client.connect(connectOptions);
 
         client.onMessageArrived = (message) => {
             const topic = message.destinationName;
@@ -277,7 +288,7 @@
     }
 
     // ============================================================
-    // ====== 检查更新（直接跳转网盘） ======
+    // ====== 检查更新 ======
     // ============================================================
 
     function checkUpdate() {
@@ -415,10 +426,10 @@
         const msg = new Paho.MQTT.Message('RESTART');
         msg.destinationName = topic;
         client.send(msg);
-        showToast('🔁 已发送重启指令');
+        显示Toast('🔁 已发送重启指令');
     }
 
-    function refreshTimers(idx) {
+    函数 刷新定时器(索引) {
         const dev = devices[idx];
         const topic = getTopics(dev.prefix).timerGet;
         const msg = new Paho.MQTT.Message('');
@@ -429,18 +440,18 @@
 
     function addTimer(idx, action) {
         const dt = document.getElementById('dt_'+idx).value;
-        if (!dt) { showToast('请选择日期时间'); return; }
+        如果 (!dt) { 显示Toast('请选择日期时间'); 返回; }
         const parts = dt.split('T');
         const datePart = parts[0], timePart = parts[1];
-        if (!datePart || !timePart) { showToast('格式错误'); return; }
+        如果 (!datePart || !timePart) { showToast('格式错误'); 返回; }
         const dateArr = datePart.split('-'), timeArr = timePart.split(':');
         const year = parseInt(dateArr[0]);
         const month = parseInt(dateArr[1]);
         const day = parseInt(dateArr[2]);
         const hour = parseInt(timeArr[0]);
         const minute = parseInt(timeArr[1]);
-        if (isNaN(year)||isNaN(month)||isNaN(day)||isNaN(hour)||isNaN(minute)) { showToast('输入无效'); return; }
-        const payload = { year, month, day, hour, minute, action };
+        如果 (isNaN(year)||isNaN(month)||isNaN(day)||isNaN(hour)||isNaN(minute)) { showToast('输入无效'); return; }
+        const payload = { 年, 月, 日, 时, 分, 操作 };
         const dev = devices[idx];
         const topic = getTopics(dev.prefix).timerAdd;
         const msg = new Paho.MQTT.Message(JSON.stringify(payload));
@@ -450,7 +461,7 @@
     }
 
     function removeTimer(idx, timerIndex) {
-        if (!confirm('取消该定时任务？')) return;
+        如果 (!confirm('取消该定时任务？')) 返回;
         const dev = devices[idx];
         const timer = dev.timers[timerIndex];
         if (!timer) return;
