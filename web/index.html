@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>多设备智能开关</title>
     <style>
-        /* 样式保持不变，与之前完全相同，此处省略避免重复 */
+        /* 原有样式保持不变... 为了简洁此处省略，实际使用时保留全部样式 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; }
@@ -23,6 +23,12 @@
         .device-card.offline .device-title .badge { background: #999; }
         .device-title { display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 600; color: #333; }
         .device-title .badge { background: #764ba2; color: #fff; font-size: 11px; padding: 2px 12px; border-radius: 30px; font-family: monospace; }
+        .device-title .name-area { display: flex; align-items: center; gap: 8px; }
+        .device-title .name-area .rename-input { font-size: 18px; font-weight: 600; border: none; border-bottom: 2px solid #764ba2; background: transparent; outline: none; color: #333; width: auto; min-width: 60px; }
+        .device-title .name-area .edit-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #888; padding: 0 4px; }
+        .device-title .name-area .edit-btn:hover { color: #764ba2; }
+        .device-title .name-area .save-btn { background: #4CAF50; color: #fff; border: none; border-radius: 12px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+        .device-title .name-area .save-btn:hover { background: #45a049; }
         .device-status { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; }
         .switch { position: relative; display: inline-block; width: 60px; height: 30px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -92,6 +98,7 @@
 
     let devices = [];
     let client = null;
+    let editingIndex = null;  // 当前正在编辑的设备索引
 
     const deviceListEl = document.getElementById('deviceList');
     const toast = document.getElementById('toast');
@@ -141,6 +148,49 @@
 
     function saveDevices() {
         localStorage.setItem('multi_devices', JSON.stringify(devices));
+    }
+
+    // ====== 重命名设备 ======
+    function startRename(idx) {
+        editingIndex = idx;
+        renderDevices();
+        // 自动聚焦输入框
+        setTimeout(() => {
+            const input = document.getElementById('rename_input_' + idx);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 100);
+    }
+
+    function saveRename(idx) {
+        const input = document.getElementById('rename_input_' + idx);
+        if (!input) return;
+        const newName = input.value.trim();
+        if (!newName) {
+            showToast('⚠️ 名称不能为空');
+            return;
+        }
+        devices[idx].name = newName;
+        saveDevices();
+        editingIndex = null;
+        renderDevices();
+        showToast('✅ 已重命名为：' + newName);
+    }
+
+    function cancelRename() {
+        editingIndex = null;
+        renderDevices();
+    }
+
+    // 按回车键保存
+    function handleRenameKeydown(e, idx) {
+        if (e.key === 'Enter') {
+            saveRename(idx);
+        } else if (e.key === 'Escape') {
+            cancelRename();
+        }
     }
 
     // ====== 添加设备 ======
@@ -223,7 +273,7 @@
                         devices[idx].timers = [];
                         showToast('🔴 ' + dev.name + ' 已离线');
                     }
-                    updateDeviceCard(idx);
+                    renderDevices();
                     return;
                 }
 
@@ -232,7 +282,7 @@
                 if (suffix === 'esp01s/progress') {
                     try {
                         devices[idx].progress = JSON.parse(payload);
-                        updateDeviceCard(idx);
+                        renderDevices();
                     } catch(e) {}
                     return;
                 }
@@ -240,14 +290,14 @@
                 if (suffix === 'esp01s/stat') {
                     if (payload === 'ON' || payload === 'OFF') {
                         devices[idx].state = payload;
-                        updateDeviceCard(idx);
+                        renderDevices();
                     }
                 } else if (suffix === 'esp01s/wifi') {
-                    try { devices[idx].wifiInfo = JSON.parse(payload); updateDeviceCard(idx); } catch(e) {}
+                    try { devices[idx].wifiInfo = JSON.parse(payload); renderDevices(); } catch(e) {}
                 } else if (suffix === 'esp01s/sysinfo') {
-                    try { devices[idx].sysInfo = JSON.parse(payload); updateDeviceCard(idx); } catch(e) {}
+                    try { devices[idx].sysInfo = JSON.parse(payload); renderDevices(); } catch(e) {}
                 } else if (suffix === 'esp01s/tlst') {
-                    try { devices[idx].timers = JSON.parse(payload); updateDeviceCard(idx); } catch(e) {}
+                    try { devices[idx].timers = JSON.parse(payload); renderDevices(); } catch(e) {}
                 }
             });
         };
@@ -309,10 +359,30 @@
                 });
             }
 
+            // 名称显示/编辑
+            let nameHtml = '';
+            if (editingIndex === idx) {
+                nameHtml = `
+                    <span class="name-area">
+                        <input class="rename-input" id="rename_input_${idx}" type="text" value="${dev.name}" 
+                               onkeydown="handleRenameKeydown(event, ${idx})">
+                        <button class="save-btn" onclick="saveRename(${idx})">保存</button>
+                        <button class="edit-btn" onclick="cancelRename()" style="color:#f44336;">✕</button>
+                    </span>
+                `;
+            } else {
+                nameHtml = `
+                    <span class="name-area">
+                        <span>${dev.name}</span>
+                        <button class="edit-btn" onclick="startRename(${idx})">✏️</button>
+                    </span>
+                `;
+            }
+
             html += `
             <div class="device-card ${cardClass}" id="card-${idx}">
                 <div class="device-title">
-                    <span>${isOnline ? '🟢' : '🔴'} ${dev.name}</span>
+                    ${nameHtml}
                     <span class="badge">${dev.prefix}</span>
                 </div>
                 ${isOnline ? `
@@ -359,10 +429,6 @@
             </div>`;
         });
         deviceListEl.innerHTML = html;
-    }
-
-    function updateDeviceCard(idx) {
-        renderDevices();
     }
 
     // ============================================================
