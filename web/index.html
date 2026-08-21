@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>多设备智能开关</title>
     <style>
-        /* 原有样式保持不变... 为了简洁此处省略，实际使用时保留全部样式 */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 600px; margin: 0 auto; }
@@ -18,6 +17,7 @@
         .add-device input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; min-width: 120px; }
         .add-device button { padding: 10px 20px; background: #4CAF50; color: #fff; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; }
         .add-device button:hover { background: #45a049; }
+
         .device-card { background: rgba(255,255,255,0.95); border-radius: 28px; padding: 20px; margin-bottom: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); transition: opacity 0.3s; }
         .device-card.offline { opacity: 0.5; filter: grayscale(0.8); }
         .device-card.offline .device-title .badge { background: #999; }
@@ -83,7 +83,7 @@
         </div>
     </div>
     <div id="deviceList"></div>
-    <div class="footer">MQTT 远程控制 · 离线自动隐藏状态</div>
+    <div class="footer">MQTT 远程控制 · 添加设备后才能控制</div>
 </div>
 <div id="toast" class="toast"></div>
 
@@ -98,7 +98,7 @@
 
     let devices = [];
     let client = null;
-    let editingIndex = null;  // 当前正在编辑的设备索引
+    let editingIndex = null;
 
     const deviceListEl = document.getElementById('deviceList');
     const toast = document.getElementById('toast');
@@ -122,17 +122,17 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    // ====== 从 localStorage 加载设备 ======
+    // ================================================================
+    // 核心修改：默认设备列表为空，用户必须手动添加
+    // ================================================================
     function loadDevices() {
         try {
             const stored = localStorage.getItem('multi_devices');
             if (stored) {
                 devices = JSON.parse(stored);
             } else {
-                devices = [
-                    { name: '思创科技园', prefix: 'x7k2p9q5m4n8', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } },
-                    { name: '客厅灯', prefix: 'y9f3h7k2m6n4', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } }
-                ];
+                // 默认设备列表为空
+                devices = [];
                 saveDevices();
             }
             devices.forEach(dev => {
@@ -150,11 +150,34 @@
         localStorage.setItem('multi_devices', JSON.stringify(devices));
     }
 
-    // ====== 重命名设备 ======
+    // ====== 添加设备 ======
+    function addDevice() {
+        const name = document.getElementById('devName').value.trim();
+        const prefix = document.getElementById('devPrefix').value.trim();
+        if (!name || !prefix) { showToast('请输入设备名称和Topic前缀'); return; }
+        if (devices.some(d => d.prefix === prefix)) { showToast('该前缀已存在'); return; }
+        devices.push({ name, prefix, state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } });
+        saveDevices();
+        document.getElementById('devName').value = '';
+        document.getElementById('devPrefix').value = '';
+        showToast('✅ 设备已添加');
+        renderDevices();
+        subscribeDevice(devices[devices.length - 1]);
+    }
+
+    // ====== 删除设备 ======
+    function removeDevice(index) {
+        if (!confirm('删除设备 "' + devices[index].name + '" ？')) return;
+        devices.splice(index, 1);
+        saveDevices();
+        renderDevices();
+        showToast('已删除设备');
+    }
+
+    // ====== 重命名功能 ======
     function startRename(idx) {
         editingIndex = idx;
         renderDevices();
-        // 自动聚焦输入框
         setTimeout(() => {
             const input = document.getElementById('rename_input_' + idx);
             if (input) {
@@ -184,37 +207,12 @@
         renderDevices();
     }
 
-    // 按回车键保存
     function handleRenameKeydown(e, idx) {
         if (e.key === 'Enter') {
             saveRename(idx);
         } else if (e.key === 'Escape') {
             cancelRename();
         }
-    }
-
-    // ====== 添加设备 ======
-    function addDevice() {
-        const name = document.getElementById('devName').value.trim();
-        const prefix = document.getElementById('devPrefix').value.trim();
-        if (!name || !prefix) { showToast('请输入设备名称和Topic前缀'); return; }
-        if (devices.some(d => d.prefix === prefix)) { showToast('该前缀已存在'); return; }
-        devices.push({ name, prefix, state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } });
-        saveDevices();
-        document.getElementById('devName').value = '';
-        document.getElementById('devPrefix').value = '';
-        showToast('✅ 设备已添加');
-        renderDevices();
-        subscribeDevice(devices[devices.length - 1]);
-    }
-
-    // ====== 删除设备 ======
-    function removeDevice(index) {
-        if (!confirm('删除设备 "' + devices[index].name + '" ？')) return;
-        devices.splice(index, 1);
-        saveDevices();
-        renderDevices();
-        showToast('已删除设备');
     }
 
     // ====== 生成主题 ======
@@ -359,7 +357,6 @@
                 });
             }
 
-            // 名称显示/编辑
             let nameHtml = '';
             if (editingIndex === idx) {
                 nameHtml = `
