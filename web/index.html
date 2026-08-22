@@ -107,6 +107,8 @@
     let devices = [];
     let client = null;
     let editingIndex = null;
+    // ====== 新增：记录定时区域展开状态 ======
+    let timerExpanded = {};
 
     const deviceListEl = document.getElementById('deviceList');
     const toast = document.getElementById('toast');
@@ -129,6 +131,15 @@
     setInterval(updateTime, 1000);
     updateTime();
 
+    // ====== 新增：本地重新计算剩余时间 ======
+    function calcRemainSeconds(timer) {
+        const now = new Date();
+        // 构造目标时间
+        const target = new Date(timer.year, timer.month - 1, timer.day, timer.hour, timer.minute, 0);
+        const diff = Math.floor((target - now) / 1000);
+        return diff > 0 ? diff : 0;
+    }
+
     function loadDevices() {
         try {
             const stored = localStorage.getItem('multi_devices');
@@ -136,8 +147,7 @@
                 devices = JSON.parse(stored);
             } else {
                 devices = [
-                    { name: '插座1', prefix: 'z9f3h7k2m6n6', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } },
-                    { name: '插座2', prefix: 'a7k2p9q5m4n9', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } }
+                    { name: '热水器', prefix: 'z9f3h7k2m6n8', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } }
                 ];
                 saveDevices();
             }
@@ -287,7 +297,16 @@
                 } else if (suffix === 'esp01s/sysinfo') {
                     try { devices[idx].sysInfo = JSON.parse(payload); renderDevices(); } catch(e) {}
                 } else if (suffix === 'esp01s/tlst') {
-                    try { devices[idx].timers = JSON.parse(payload); renderDevices(); } catch(e) {}
+                    try {
+                        const timers = JSON.parse(payload);
+                        // 保留设备端上报的定时数据，但 remain 我们本地重新计算
+                        devices[idx].timers = timers.map(t => {
+                            // 如果设备端没有上报 repeat 字段，默认为 false
+                            if (t.repeat === undefined) t.repeat = false;
+                            return t;
+                        });
+                        renderDevices();
+                    } catch(e) {}
                 }
             });
         };
@@ -306,6 +325,7 @@
         client.subscribe(topics.timerList);
     }
 
+    // ====== 渲染设备卡片（修复：保持定时区域状态） ======
     function renderDevices() {
         if (devices.length === 0) {
             deviceListEl.innerHTML = '<p class="empty-msg">暂无设备，请添加</p>';
@@ -331,10 +351,11 @@
             } else {
                 timers.forEach((t, ti) => {
                     const actionText = t.action === 'ON' ? '开' : '关';
-                    const remain = t.remain !== undefined ? `(${t.remain}s)` : '';
+                    // ====== 本地重新计算剩余时间 ======
+                    const remain = calcRemainSeconds(t);
                     const repeatBadge = t.repeat ? '<span class="repeat-badge">🔄每天</span>' : '';
                     timersHtml += `<div class="timer-item">
-                        <span>${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} ${remain} ${repeatBadge}</span>
+                        <span>${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} (${remain}s) ${repeatBadge}</span>
                         <button class="btn-cancel" onclick="removeTimer(${idx}, ${ti})">取消</button>
                     </div>`;
                 });
@@ -359,6 +380,10 @@
                 `;
             }
 
+            // ====== 检查定时区域是否应该展开 ======
+            const isExpanded = timerExpanded[idx] || false;
+            const displayStyle = isExpanded ? 'block' : 'none';
+
             html += `
             <div class="device-card ${cardClass}" id="card-${idx}">
                 <div class="card-header">
@@ -380,7 +405,7 @@
                         <button class="btn-big ${stateClass}" onclick="toggleDevice(${idx}, ${!isOn})" ${!isOnline ? 'disabled' : ''}>
                             ${stateText}
                         </button>
-                        <button class="btn-big timer" onclick="document.getElementById('timer_section_${idx}').style.display='block'">
+                        <button class="btn-big timer" onclick="toggleTimerSection(${idx})">
                             ⏱ 定时
                         </button>
                     </div>
@@ -402,7 +427,7 @@
                     <button class="btn-del" onclick="removeDevice(${idx})">🗑️ 删除</button>
                 </div>
 
-                <div class="timer-section" id="timer_section_${idx}" style="display:none;">
+                <div class="timer-section" id="timer_section_${idx}" style="display:${displayStyle};">
                     <div class="timer-input">
                         <input type="time" id="dt_time_${idx}">
                         <label class="repeat-check">
@@ -412,12 +437,53 @@
                         <button class="btn-timer-off" onclick="addTimer(${idx}, 'OFF')">关</button>
                         <button class="btn-refresh" onclick="refreshTimers(${idx})">🔄</button>
                     </div>
-                    <div class="timer-list">${timersHtml}</div>
+                    <div class="timer-list" id="timer_list_${idx}">${timersHtml}</div>
                 </div>
             </div>`;
         });
         deviceListEl.innerHTML = html;
     }
+
+    // ====== 新增：切换定时区域展开状态 ======
+    function toggleTimerSection(idx) {
+        timerExpanded[idx] = !timerExpanded[idx];
+        renderDevices();
+        // 如果展开，聚焦到时间输入框
+        if (timerExpanded[idx]) {
+            setTimeout(() => {
+                const input = document.getElementById('dt_time_' + idx);
+                if (input) input.focus();
+            }, 100);
+        }
+    }
+
+    // ====== 每秒刷新定时列表的剩余时间 ======
+    function refreshTimerRemains() {
+        // 遍历所有设备，更新定时列表显示
+        devices.forEach((dev, idx) => {
+            const listEl = document.getElementById('timer_list_' + idx);
+            if (!listEl) return;
+            const timers = dev.timers || [];
+            if (timers.length === 0) {
+                listEl.innerHTML = '<div style="color:#bbb;font-size:13px;padding:4px 0;">暂无定时任务</div>';
+                return;
+            }
+            let html = '';
+            timers.forEach((t, ti) => {
+                const actionText = t.action === 'ON' ? '开' : '关';
+                const remain = calcRemainSeconds(t);
+                const repeatBadge = t.repeat ? '<span class="repeat-badge">🔄每天</span>' : '';
+                html += `<div class="timer-item">
+                    <span>${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} (${remain}s) ${repeatBadge}</span>
+                    <button class="btn-cancel" onclick="removeTimer(${idx}, ${ti})">取消</button>
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        });
+    }
+
+    // 每秒刷新剩余时间
+    setInterval(refreshTimerRemains, 1000);
 
     function toggleDevice(idx, checked) {
         const dev = devices[idx];
@@ -474,10 +540,13 @@
         let year = now.getFullYear();
         let month = now.getMonth() + 1;
         let day = now.getDate();
+        // 如果设置的时间已经过了，则设为明天
         if (hour < now.getHours() || (hour === now.getHours() && minute <= now.getMinutes())) {
             day += 1;
         }
-        if (day > 31) { day = 1; month += 1; }
+        // 简单跨月处理
+        const maxDay = new Date(year, month, 0).getDate();
+        if (day > maxDay) { day = 1; month += 1; }
         if (month > 12) { month = 1; year += 1; }
         
         const repeat = repeatCheck.checked;
@@ -496,6 +565,11 @@
         msg.destinationName = topic;
         client.send(msg);
         showToast(`📤 定时 ${action==='ON'?'开':'关'} ${repeat ? '(每天)' : '(单次)'}`);
+        
+        // 添加定时后保持定时区域展开
+        timerExpanded[idx] = true;
+        // 等待设备回复后刷新列表
+        setTimeout(() => refreshTimers(idx), 500);
     }
 
     function removeTimer(idx, timerIndex) {
@@ -509,6 +583,9 @@
         msg.destinationName = topic;
         client.send(msg);
         showToast('已删除定时');
+        // 删除后保持定时区域展开
+        timerExpanded[idx] = true;
+        setTimeout(() => refreshTimers(idx), 500);
     }
 
     loadDevices();
