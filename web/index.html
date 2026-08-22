@@ -19,60 +19,58 @@
         .add-device button { padding: 10px 20px; background: #667eea; color: #fff; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 14px; transition: .2s; }
         .add-device button:hover { background: #5a6fd6; }
 
-        /* 设备卡片 */
         .device-card { background: #fff; border-radius: 20px; padding: 18px 16px; margin-bottom: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; transition: all 0.2s; }
         .device-card.offline { opacity: 0.5; filter: grayscale(0.6); }
-        .device-card .card-header { display: flex; justify-content: space-between; align-items: center; }
-        .device-card .card-header .left { display: flex; align-items: center; gap: 10px; }
-        .device-card .card-header .left .icon { width: 44px; height: 44px; background: #f0f2ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-        .device-card .card-header .left .name-area { display: flex; flex-direction: column; }
-        .device-card .card-header .left .name-area .device-name { font-size: 17px; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 6px; }
-        .device-card .card-header .left .name-area .device-name .edit-btn { background: none; border: none; font-size: 14px; color: #ccc; cursor: pointer; padding: 0 4px; }
-        .device-card .card-header .left .name-area .device-name .edit-btn:hover { color: #667eea; }
-        .device-card .card-header .left .name-area .room-tag { font-size: 12px; color: #999; background: #f5f5f5; padding: 0 12px; border-radius: 12px; display: inline-block; margin-top: 2px; width: fit-content; }
-        .device-card .card-header .right { display: flex; align-items: center; gap: 6px; }
-        .device-card .card-header .right .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .device-card .card-header .right .status-dot.online { background: #4caf50; }
-        .device-card .card-header .right .status-dot.offline { background: #f44336; }
-        .device-card .card-header .right .status-text { font-size: 13px; font-weight: 500; color: #666; }
 
-        /* 开关区域 - 加大开关尺寸 */
-        .switch-area { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 12px; }
-        .switch-area .state-label { font-size: 18px; font-weight: 600; color: #333; }
-        .switch-area .state-label.on { color: #667eea; }
-        .switch-area .state-label.off { color: #999; }
-        .switch-area .switch { position: relative; display: inline-block; width: 60px; height: 34px; flex-shrink: 0; }
-        .switch-area .switch input { opacity: 0; width: 0; height: 0; }
-        .switch-area .switch .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; transition: .3s; border-radius: 34px; }
-        .switch-area .switch .slider:before { position: absolute; content: ''; height: 26px; width: 26px; left: 4px; bottom: 4px; background: #fff; transition: .3s; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-        .switch-area .switch input:checked + .slider { background: #667eea; }
-        .switch-area .switch input:checked + .slider:before { transform: translateX(26px); }
+        /* 卡片头部 */
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .card-header .left { display: flex; align-items: center; gap: 10px; }
+        .card-header .left .icon { width: 44px; height: 44px; background: #f0f2ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .card-header .left .name-area { display: flex; flex-direction: column; }
+        .card-header .left .name-area .device-name { font-size: 17px; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 6px; }
+        .card-header .left .name-area .device-name .edit-btn { background: none; border: none; font-size: 14px; color: #ccc; cursor: pointer; padding: 0 4px; }
+        .card-header .left .name-area .device-name .edit-btn:hover { color: #667eea; }
+        .card-header .left .name-area .room-tag { font-size: 12px; color: #999; background: #f5f5f5; padding: 0 12px; border-radius: 12px; display: inline-block; margin-top: 2px; width: fit-content; }
+        .card-header .right .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+        .card-header .right .status-dot.online { background: #4caf50; }
+        .card-header .right .status-dot.offline { background: #f44336; }
+        .card-header .right .status-text { font-size: 13px; font-weight: 500; color: #666; }
 
-        .device-card .info-row { font-size: 13px; color: #888; margin: 6px 0; line-height: 1.5; background: #f8f9fa; padding: 8px 12px; border-radius: 12px; }
-        .device-card .info-row span { display: inline-block; margin-right: 16px; }
+        /* 大按钮行：开关 + 定时 */
+        .big-btn-row { display: flex; gap: 12px; margin: 16px 0 12px; }
+        .big-btn-row .btn-big { flex: 1; padding: 16px 0; border: none; border-radius: 16px; font-size: 20px; font-weight: 700; cursor: pointer; transition: .2s; color: #fff; min-height: 72px; display: flex; align-items: center; justify-content: center; }
+        .big-btn-row .btn-big.on { background: #667eea; }
+        .big-btn-row .btn-big.off { background: #ccc; color: #888; }
+        .big-btn-row .btn-big.timer { background: #ff9800; }
+        .big-btn-row .btn-big.timer:hover { background: #e68900; }
+        .big-btn-row .btn-big:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        .device-card .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
-        .device-card .action-row button { padding: 6px 16px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 13px; color: #fff; transition: .2s; }
-        .device-card .action-row .btn-timer { background: #ff9800; }
-        .device-card .action-row .btn-timer:hover { background: #e68900; }
-        .device-card .action-row .btn-reset { background: #f44336; }
-        .device-card .action-row .btn-reset:hover { background: #d32f2f; }
-        .device-card .action-row .btn-restart { background: #2196f3; }
-        .device-card .action-row .btn-restart:hover { background: #1976d2; }
-        .device-card .action-row .btn-del { background: #9e9e9e; }
-        .device-card .action-row .btn-del:hover { background: #757575; }
-        .device-card .action-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* 信息行 */
+        .info-row { font-size: 13px; color: #888; margin: 6px 0; line-height: 1.6; background: #f8f9fa; padding: 8px 12px; border-radius: 12px; }
+        .info-row span { display: inline-block; margin-right: 14px; }
 
-        .device-card .timer-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
-        .device-card .timer-section .timer-input { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .device-card .timer-section .timer-input input[type="datetime-local"] { padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 13px; flex: 1; min-width: 140px; background: #fafafa; }
-        .device-card .timer-section .timer-input button { padding: 6px 14px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 12px; color: #fff; }
-        .device-card .timer-section .timer-input .btn-timer-on { background: #4caf50; }
-        .device-card .timer-section .timer-input .btn-timer-off { background: #f44336; }
-        .device-card .timer-section .timer-input .btn-refresh { background: #2196f3; }
-        .device-card .timer-section .timer-list { margin-top: 8px; font-size: 13px; color: #555; max-height: 120px; overflow-y: auto; }
-        .device-card .timer-section .timer-item { background: #f8f9fa; padding: 4px 10px; margin: 3px 0; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .device-card .timer-section .timer-item .btn-cancel { background: #f44336; color: #fff; border: none; border-radius: 12px; padding: 0 10px; font-size: 11px; cursor: pointer; }
+        /* 操作按钮行（重置WiFi、重启、删除） */
+        .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .action-row button { padding: 6px 16px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 13px; color: #fff; transition: .2s; }
+        .action-row .btn-reset { background: #f44336; }
+        .action-row .btn-reset:hover { background: #d32f2f; }
+        .action-row .btn-restart { background: #2196f3; }
+        .action-row .btn-restart:hover { background: #1976d2; }
+        .action-row .btn-del { background: #9e9e9e; }
+        .action-row .btn-del:hover { background: #757575; }
+        .action-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* 定时区域 */
+        .timer-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .timer-section .timer-input { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .timer-section .timer-input input[type="datetime-local"] { padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 13px; flex: 1; min-width: 140px; background: #fafafa; }
+        .timer-section .timer-input button { padding: 6px 14px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 12px; color: #fff; }
+        .timer-section .timer-input .btn-timer-on { background: #4caf50; }
+        .timer-section .timer-input .btn-timer-off { background: #f44336; }
+        .timer-section .timer-input .btn-refresh { background: #2196f3; }
+        .timer-section .timer-list { margin-top: 8px; font-size: 13px; color: #555; max-height: 120px; overflow-y: auto; }
+        .timer-section .timer-item { background: #f8f9fa; padding: 4px 10px; margin: 3px 0; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .timer-section .timer-item .btn-cancel { background: #f44336; color: #fff; border: none; border-radius: 12px; padding: 0 10px; font-size: 11px; cursor: pointer; }
 
         .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 24px; border-radius: 30px; font-size: 14px; z-index: 999; transition: .3s; opacity: 0; pointer-events: none; }
         .toast.show { opacity: 1; }
@@ -143,7 +141,6 @@
             if (stored) {
                 devices = JSON.parse(stored);
             } else {
-                // 默认示例设备
                 devices = [
                     { name: '插座1', prefix: 'z9f3h7k2m6n6', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } },
                     { name: '插座2', prefix: 'a7k2p9q5m4n9', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } }
@@ -330,9 +327,9 @@
             const isOnline = dev.online || false;
             const cardClass = isOnline ? '' : 'offline';
             const state = dev.state || 'UNKNOWN';
-            const stateText = state === 'ON' ? '已开启' : (state === 'OFF' ? '已关闭' : (isOnline ? '未知' : '离线'));
-            const stateClass = state === 'ON' ? 'on' : 'off';
-            const checked = state === 'ON' ? 'checked' : '';
+            const isOn = state === 'ON';
+            const stateText = isOn ? '开' : '关';
+            const stateClass = isOn ? 'on' : 'off';
             const wifi = dev.wifiInfo || {};
             const sys = dev.sysInfo || {};
             const uptimeStr = sys.uptime ? Math.floor(sys.uptime/3600)+'h '+Math.floor((sys.uptime%3600)/60)+'m' : '--';
@@ -393,12 +390,14 @@
                 </div>
 
                 ${isOnline ? `
-                    <div class="switch-area">
-                        <span class="state-label ${stateClass}">${stateText}</span>
-                        <label class="switch">
-                            <input type="checkbox" ${checked} onchange="toggleDevice(${idx}, this.checked)">
-                            <span class="slider"></span>
-                        </label>
+                    <!-- 大按钮行：开关 + 定时 -->
+                    <div class="big-btn-row">
+                        <button class="btn-big ${stateClass}" onclick="toggleDevice(${idx}, ${!isOn})" ${!isOnline ? 'disabled' : ''}>
+                            ${stateText}
+                        </button>
+                        <button class="btn-big timer" onclick="document.getElementById('timer_section_${idx}').style.display='block'">
+                            ⏱ 定时
+                        </button>
                     </div>
                     <div class="info-row">
                         <span>📶 ${wifi.ssid || '--'} 信号: ${wifi.rssi || '--'} dBm</span>
@@ -413,7 +412,6 @@
                 `}
 
                 <div class="action-row">
-                    <button class="btn-timer" onclick="document.getElementById('timer_section_${idx}').style.display='block'" ${!isOnline ? 'disabled' : ''}>⏱ 定时</button>
                     <button class="btn-reset" onclick="resetWiFi(${idx})" ${!isOnline ? 'disabled' : ''}>🔄 重置WiFi</button>
                     <button class="btn-restart" onclick="restartDevice(${idx})" ${!isOnline ? 'disabled' : ''}>🔁 重启</button>
                     <button class="btn-del" onclick="removeDevice(${idx})">🗑️ 删除</button>
