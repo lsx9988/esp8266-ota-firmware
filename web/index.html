@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多设备智能控制</title>
+    <title>智能设备控制</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body { background: #f0f2f5; min-height: 100vh; padding: 16px; }
@@ -19,7 +19,7 @@
         .add-device button { padding: 10px 20px; background: #667eea; color: #fff; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 14px; transition: .2s; }
         .add-device button:hover { background: #5a6fd6; }
 
-        .device-card { background: #fff; border-radius: 20px; padding: 18px 16px; margin-bottom: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; transition: all 0.2s; }
+        .device-card { background: #fff; border-radius: 20px; padding: 18px 16px; margin-bottom: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; }
         .device-card.offline { opacity: 0.5; filter: grayscale(0.6); }
 
         .card-header { display: flex; justify-content: space-between; align-items: center; }
@@ -59,15 +59,13 @@
         .timer-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
         .timer-section .timer-input { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .timer-section .timer-input input[type="time"] { padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 13px; flex: 1; min-width: 100px; background: #fafafa; }
-        .timer-section .timer-input .repeat-check { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #555; }
-        .timer-section .timer-input .repeat-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: #667eea; }
+        .timer-section .timer-input input[type="date"] { padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 13px; flex: 1; min-width: 130px; background: #fafafa; }
         .timer-section .timer-input button { padding: 6px 14px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 12px; color: #fff; }
         .timer-section .timer-input .btn-timer-on { background: #4caf50; }
         .timer-section .timer-input .btn-timer-off { background: #f44336; }
         .timer-section .timer-input .btn-refresh { background: #2196f3; }
         .timer-section .timer-list { margin-top: 8px; font-size: 13px; color: #555; max-height: 120px; overflow-y: auto; }
         .timer-section .timer-item { background: #f8f9fa; padding: 4px 10px; margin: 3px 0; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .timer-section .timer-item .repeat-badge { background: #ff9800; color: #fff; font-size: 10px; padding: 0 8px; border-radius: 10px; margin-left: 6px; }
         .timer-section .timer-item .btn-cancel { background: #f44336; color: #fff; border: none; border-radius: 12px; padding: 0 10px; font-size: 11px; cursor: pointer; }
 
         .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 24px; border-radius: 30px; font-size: 14px; z-index: 999; transition: .3s; opacity: 0; pointer-events: none; }
@@ -79,7 +77,7 @@
 <body>
 <div class="container">
     <div class="header">
-        <h1><span>⚡ 智能家居</span></h1>
+        <h1><span>⚡ 智能设备</span></h1>
         <div class="sub">
             <span id="currentTime">同步中...</span>
             <span style="color:#aaa;">在线: <span id="onlineCount">0</span></span>
@@ -130,23 +128,12 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    // ========== 核心：计算剩余秒数（每日循环使用当前日期） ==========
+    // 计算剩余秒数
     function calcRemainSeconds(timer) {
         const now = new Date();
-        if (timer.repeat) {
-            // 每日循环：基于今天的时分计算到下次触发的秒数
-            let target = new Date(now);
-            target.setHours(timer.hour, timer.minute, 0, 0);
-            if (target <= now) {
-                target.setDate(target.getDate() + 1);
-            }
-            return Math.floor((target - now) / 1000);
-        } else {
-            // 单次定时：使用设备上报的日期
-            const target = new Date(timer.year, timer.month - 1, timer.day, timer.hour, timer.minute, 0);
-            const diff = Math.floor((target - now) / 1000);
-            return diff > 0 ? diff : 0;
-        }
+        const target = new Date(timer.year, timer.month - 1, timer.day, timer.hour, timer.minute, 0);
+        const diff = Math.floor((target - now) / 1000);
+        return diff > 0 ? diff : 0;
     }
 
     function loadDevices() {
@@ -309,7 +296,6 @@
                     try {
                         const timers = JSON.parse(payload);
                         devices[idx].timers = timers.map(t => {
-                            if (t.repeat === undefined) t.repeat = false;
                             return t;
                         });
                         renderDevices();
@@ -359,9 +345,8 @@
                 timers.forEach((t, ti) => {
                     const actionText = t.action === 'ON' ? '开' : '关';
                     const remain = calcRemainSeconds(t);
-                    const repeatBadge = t.repeat ? '<span class="repeat-badge">🔄每天</span>' : '';
                     timersHtml += `<div class="timer-item">
-                        <span>${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} (${remain}s) ${repeatBadge}</span>
+                        <span>${String(t.year)}-${String(t.month).padStart(2,'0')}-${String(t.day).padStart(2,'0')} ${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} (${remain}s)</span>
                         <button class="btn-cancel" onclick="removeTimer(${idx}, ${ti})">取消</button>
                     </div>`;
                 });
@@ -435,9 +420,7 @@
                 <div class="timer-section" id="timer_section_${idx}" style="display:${displayStyle};">
                     <div class="timer-input">
                         <input type="time" id="dt_time_${idx}">
-                        <label class="repeat-check">
-                            <input type="checkbox" id="dt_repeat_${idx}"> 每天
-                        </label>
+                        <input type="date" id="dt_date_${idx}">
                         <button class="btn-timer-on" onclick="addTimer(${idx}, 'ON')">开</button>
                         <button class="btn-timer-off" onclick="addTimer(${idx}, 'OFF')">关</button>
                         <button class="btn-refresh" onclick="refreshTimers(${idx})">🔄</button>
@@ -449,7 +432,6 @@
         deviceListEl.innerHTML = html;
     }
 
-    // ====== 切换定时区域展开 ======
     function toggleTimerSection(idx) {
         timerExpanded[idx] = !timerExpanded[idx];
         renderDevices();
@@ -461,7 +443,7 @@
         }
     }
 
-    // ====== 每秒更新剩余时间（只更新定时列表，不重绘全卡片） ======
+    // 每秒刷新剩余时间
     function refreshTimerRemains() {
         devices.forEach((dev, idx) => {
             const listEl = document.getElementById('timer_list_' + idx);
@@ -475,17 +457,14 @@
             timers.forEach((t, ti) => {
                 const actionText = t.action === 'ON' ? '开' : '关';
                 const remain = calcRemainSeconds(t);
-                const repeatBadge = t.repeat ? '<span class="repeat-badge">🔄每天</span>' : '';
                 html += `<div class="timer-item">
-                    <span>${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} (${remain}s) ${repeatBadge}</span>
+                    <span>${String(t.year)}-${String(t.month).padStart(2,'0')}-${String(t.day).padStart(2,'0')} ${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} (${remain}s)</span>
                     <button class="btn-cancel" onclick="removeTimer(${idx}, ${ti})">取消</button>
                 </div>`;
             });
             listEl.innerHTML = html;
         });
     }
-
-    // 每秒刷新一次剩余时间
     setInterval(refreshTimerRemains, 1000);
 
     // ====== 控制函数 ======
@@ -530,53 +509,49 @@
         showToast('🔄 刷新定时');
     }
 
-    // ====== 添加定时（只发MQTT，不主动刷新，等设备回复） ======
+    // 添加定时（单次）
     function addTimer(idx, action) {
         const timeInput = document.getElementById('dt_time_'+idx);
-        const repeatCheck = document.getElementById('dt_repeat_'+idx);
+        const dateInput = document.getElementById('dt_date_'+idx);
         const timeVal = timeInput.value;
-        if (!timeVal) { showToast('请选择时间'); return; }
-        const parts = timeVal.split(':');
-        const hour = parseInt(parts[0]);
-        const minute = parseInt(parts[1]);
-        if (isNaN(hour)||isNaN(minute)) { showToast('输入无效'); return; }
-        
-        const now = new Date();
-        let year = now.getFullYear();
-        let month = now.getMonth() + 1;
-        let day = now.getDate();
-        // 如果设置的时间已经过了，则设为明天
-        if (hour < now.getHours() || (hour === now.getHours() && minute <= now.getMinutes())) {
-            day += 1;
+        const dateVal = dateInput.value;
+        if (!timeVal || !dateVal) { showToast('请选择日期和时间'); return; }
+        const timeParts = timeVal.split(':');
+        const dateParts = dateVal.split('-');
+        const hour = parseInt(timeParts[0]);
+        const minute = parseInt(timeParts[1]);
+        const year = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]);
+        const day = parseInt(dateParts[2]);
+        if (isNaN(hour)||isNaN(minute)||isNaN(year)||isNaN(month)||isNaN(day)) {
+            showToast('输入无效');
+            return;
         }
-        // 简单跨月处理
-        const maxDay = new Date(year, month, 0).getDate();
-        if (day > maxDay) { day = 1; month += 1; }
-        if (month > 12) { month = 1; year += 1; }
-        
-        const repeat = repeatCheck.checked;
+        // 检查时间是否已过
+        const now = new Date();
+        const target = new Date(year, month-1, day, hour, minute, 0);
+        if (target <= now) {
+            showToast('时间已过，请选择未来时间');
+            return;
+        }
         const payload = {
             year: year,
             month: month,
             day: day,
             hour: hour,
             minute: minute,
-            action: action,
-            repeat: repeat
+            action: action
         };
         const dev = devices[idx];
         const topic = getTopics(dev.prefix).timerAdd;
         const msg = new Paho.MQTT.Message(JSON.stringify(payload));
         msg.destinationName = topic;
         client.send(msg);
-        showToast(`📤 定时 ${action==='ON'?'开':'关'} ${repeat ? '(每天)' : '(单次)'}`);
-        
-        // 保持定时区域展开（设备回复后会重新渲染）
+        showToast(`📤 定时 ${action==='ON'?'开':'关'}`);
         timerExpanded[idx] = true;
-        // 不需要主动刷新，等待设备回复 timerList
     }
 
-    // ====== 删除定时（只发MQTT） ======
+    // 删除定时
     function removeTimer(idx, timerIndex) {
         if (!confirm('取消该定时任务？')) return;
         const dev = devices[idx];
@@ -589,7 +564,6 @@
         client.send(msg);
         showToast('已删除定时');
         timerExpanded[idx] = true;
-        // 等待设备回复
     }
 
     loadDevices();
