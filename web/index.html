@@ -3,98 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多设备智能开关</title>
+    <title>多设备智能控制</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; }
-        .header { background: rgba(255,255,255,0.95); border-radius: 28px; padding: 20px; margin-bottom: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        h1 { text-align: center; font-size: 28px; font-weight: 600; color: #333; }
-        h1 span { background: linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        #currentTime { text-align: center; font-size: 16px; color: #666; margin-top: 8px; }
-        #versionInfo { text-align: center; font-size: 12px; color: #999; margin-top: 4px; }
-        .add-device { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
-        .add-device input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; min-width: 120px; }
-        .add-device button { padding: 10px 20px; background: #4CAF50; color: #fff; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; }
-        .add-device button:hover { background: #45a049; }
+        body { background: #f0f2f5; min-height: 100vh; padding: 16px; }
+        .container { max-width: 480px; margin: 0 auto; }
+        .header { background: #fff; border-radius: 24px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 24px; font-weight: 700; color: #1a1a2e; display: flex; align-items: center; gap: 8px; }
+        .header h1 span { background: linear-gradient(135deg,#667eea,#764ba2); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .header .sub { font-size: 14px; color: #999; margin-top: 4px; display: flex; justify-content: space-between; }
+        .header .sub #currentTime { font-weight: 500; color: #666; }
+        .add-device { display: flex; gap: 8px; margin: 16px 0 8px; flex-wrap: wrap; }
+        .add-device input { flex: 1; padding: 10px 14px; border: 1px solid #e0e0e0; border-radius: 20px; font-size: 14px; background: #f8f9fa; outline: none; min-width: 100px; }
+        .add-device input:focus { border-color: #667eea; background: #fff; }
+        .add-device button { padding: 10px 20px; background: #667eea; color: #fff; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 14px; transition: .2s; }
+        .add-device button:hover { background: #5a6fd6; }
 
-        .device-card { background: rgba(255,255,255,0.95); border-radius: 28px; padding: 20px; margin-bottom: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); transition: opacity 0.3s; }
-        .device-card.offline { opacity: 0.5; filter: grayscale(0.8); }
-        .device-card.offline .device-title .badge { background: #999; }
-        .device-title { display: flex; justify-content: space-between; align-items: center; font-size: 20px; font-weight: 600; color: #333; }
-        .device-title .badge { background: #764ba2; color: #fff; font-size: 11px; padding: 2px 12px; border-radius: 30px; font-family: monospace; }
-        .device-title .name-area { display: flex; align-items: center; gap: 8px; }
-        .device-title .name-area .rename-input { font-size: 18px; font-weight: 600; border: none; border-bottom: 2px solid #764ba2; background: transparent; outline: none; color: #333; width: auto; min-width: 60px; }
-        .device-title .name-area .edit-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #888; padding: 0 4px; }
-        .device-title .name-area .edit-btn:hover { color: #764ba2; }
-        .device-title .name-area .save-btn { background: #4CAF50; color: #fff; border: none; border-radius: 12px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
-        .device-title .name-area .save-btn:hover { background: #45a049; }
-        .device-status { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; }
-        .switch { position: relative; display: inline-block; width: 60px; height: 30px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; transition: .3s; border-radius: 30px; }
-        .slider:before { position: absolute; content: ''; height: 22px; width: 22px; left: 4px; bottom: 4px; background: #fff; transition: .3s; border-radius: 50%; }
-        input:checked + .slider { background: #4CAF50; }
-        input:checked + .slider:before { transform: translateX(30px); }
-        .state-label { font-size: 18px; font-weight: 500; }
-        .state-label.on { color: #4CAF50; }
-        .state-label.off { color: #f44336; }
-        .state-label.unknown { color: #999; }
-        .state-label.offline-text { color: #999; }
-        .device-info { font-size: 14px; color: #888; margin: 5px 0; line-height: 1.6; }
-        .device-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .device-actions button { padding: 6px 14px; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 13px; color: #fff; }
-        .btn-reset { background: #ff5722; }
-        .btn-reset:hover { background: #e64a19; }
-        .btn-restart { background: #2196F3; }
-        .btn-restart:hover { background: #0b7dda; }
-        .btn-del { background: #f44336; }
-        .btn-del:hover { background: #da190b; }
-        .progress-container { margin: 5px 0 10px 0; height: 4px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
-        .progress-bar { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; border-radius: 4px; transition: width 0.5s; }
-        .progress-text { font-size: 12px; color: #888; margin-top: 2px; }
-        .timer-section { margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
-        .timer-section .timer-input { display: flex; flex-wrap: wrap; gap: 8px; }
-        .timer-section input[type="datetime-local"] { padding: 6px 10px; border: 1px solid #ddd; border-radius: 20px; font-size: 13px; flex: 1; min-width: 150px; }
-        .timer-section button { padding: 6px 14px; border: none; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 13px; color: #fff; }
-        .timer-section .btn-on { background: #4CAF50; }
-        .timer-section .btn-off { background: #f44336; }
-        .timer-section .btn-refresh { background: #2196F3; }
-        .timer-list { margin-top: 10px; font-size: 13px; color: #333; max-height: 150px; overflow-y: auto; }
-        .timer-item { background: #f8f9fa; padding: 6px 10px; margin: 4px 0; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .timer-item .btn-cancel { background: #f44336; color: #fff; border: none; border-radius: 20px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
-        .footer { text-align: center; color: #aaa; font-size: 12px; margin-top: 20px; }
-        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 12px 24px; border-radius: 30px; font-size: 14px; z-index: 999; transition: .3s; opacity: 0; pointer-events: none; }
+        /* 设备卡片 */
+        .device-card { background: #fff; border-radius: 20px; padding: 18px 16px; margin-bottom: 14px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #f0f0f0; transition: all 0.2s; }
+        .device-card.offline { opacity: 0.5; filter: grayscale(0.6); }
+        .device-card .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .device-card .card-header .left { display: flex; align-items: center; gap: 10px; }
+        .device-card .card-header .left .icon { width: 44px; height: 44px; background: #f0f2ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .device-card .card-header .left .name-area { display: flex; flex-direction: column; }
+        .device-card .card-header .left .name-area .device-name { font-size: 17px; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 6px; }
+        .device-card .card-header .left .name-area .device-name .edit-btn { background: none; border: none; font-size: 14px; color: #ccc; cursor: pointer; padding: 0 4px; }
+        .device-card .card-header .left .name-area .device-name .edit-btn:hover { color: #667eea; }
+        .device-card .card-header .left .name-area .room-tag { font-size: 12px; color: #999; background: #f5f5f5; padding: 0 12px; border-radius: 12px; display: inline-block; margin-top: 2px; width: fit-content; }
+        .device-card .card-header .right { display: flex; align-items: center; gap: 6px; }
+        .device-card .card-header .right .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .device-card .card-header .right .status-dot.online { background: #4caf50; }
+        .device-card .card-header .right .status-dot.offline { background: #f44336; }
+        .device-card .card-header .right .status-text { font-size: 13px; font-weight: 500; color: #666; }
+
+        /* 开关区域 - 加大开关尺寸 */
+        .switch-area { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 12px; }
+        .switch-area .state-label { font-size: 18px; font-weight: 600; color: #333; }
+        .switch-area .state-label.on { color: #667eea; }
+        .switch-area .state-label.off { color: #999; }
+        .switch-area .switch { position: relative; display: inline-block; width: 60px; height: 34px; flex-shrink: 0; }
+        .switch-area .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-area .switch .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; transition: .3s; border-radius: 34px; }
+        .switch-area .switch .slider:before { position: absolute; content: ''; height: 26px; width: 26px; left: 4px; bottom: 4px; background: #fff; transition: .3s; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .switch-area .switch input:checked + .slider { background: #667eea; }
+        .switch-area .switch input:checked + .slider:before { transform: translateX(26px); }
+
+        .device-card .info-row { font-size: 13px; color: #888; margin: 6px 0; line-height: 1.5; background: #f8f9fa; padding: 8px 12px; border-radius: 12px; }
+        .device-card .info-row span { display: inline-block; margin-right: 16px; }
+
+        .device-card .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .device-card .action-row button { padding: 6px 16px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 13px; color: #fff; transition: .2s; }
+        .device-card .action-row .btn-timer { background: #ff9800; }
+        .device-card .action-row .btn-timer:hover { background: #e68900; }
+        .device-card .action-row .btn-reset { background: #f44336; }
+        .device-card .action-row .btn-reset:hover { background: #d32f2f; }
+        .device-card .action-row .btn-restart { background: #2196f3; }
+        .device-card .action-row .btn-restart:hover { background: #1976d2; }
+        .device-card .action-row .btn-del { background: #9e9e9e; }
+        .device-card .action-row .btn-del:hover { background: #757575; }
+        .device-card .action-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .device-card .timer-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; }
+        .device-card .timer-section .timer-input { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .device-card .timer-section .timer-input input[type="datetime-local"] { padding: 6px 10px; border: 1px solid #e0e0e0; border-radius: 16px; font-size: 13px; flex: 1; min-width: 140px; background: #fafafa; }
+        .device-card .timer-section .timer-input button { padding: 6px 14px; border: none; border-radius: 16px; font-weight: 500; cursor: pointer; font-size: 12px; color: #fff; }
+        .device-card .timer-section .timer-input .btn-timer-on { background: #4caf50; }
+        .device-card .timer-section .timer-input .btn-timer-off { background: #f44336; }
+        .device-card .timer-section .timer-input .btn-refresh { background: #2196f3; }
+        .device-card .timer-section .timer-list { margin-top: 8px; font-size: 13px; color: #555; max-height: 120px; overflow-y: auto; }
+        .device-card .timer-section .timer-item { background: #f8f9fa; padding: 4px 10px; margin: 3px 0; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .device-card .timer-section .timer-item .btn-cancel { background: #f44336; color: #fff; border: none; border-radius: 12px; padding: 0 10px; font-size: 11px; cursor: pointer; }
+
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 24px; border-radius: 30px; font-size: 14px; z-index: 999; transition: .3s; opacity: 0; pointer-events: none; }
         .toast.show { opacity: 1; }
-        .empty-msg { color: #999; text-align: center; padding: 20px 0; }
-        .version-tag { background: #764ba2; color: #fff; font-size: 10px; padding: 2px 10px; border-radius: 20px; display: inline-block; }
+        .empty-msg { text-align: center; color: #999; padding: 40px 0; font-size: 16px; }
+        .footer { text-align: center; color: #bbb; font-size: 12px; margin-top: 20px; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1><span>⚡ 多设备智能开关</span></h1>
-        <div id="currentTime">🕒 同步中...</div>
-        <div id="versionInfo">📌 版本 <span id="versionTag">1.0</span></div>
+        <h1><span>⚡ 智能家居</span></h1>
+        <div class="sub">
+            <span id="currentTime">同步中...</span>
+            <span style="color:#aaa;">在线: <span id="onlineCount">0</span></span>
+        </div>
         <div class="add-device">
-            <input type="text" id="devName" placeholder="设备名称（如书房）">
-            <input type="text" id="devPrefix" placeholder="Topic前缀（如 x7k2p9q5m4n8）">
-            <button onclick="addDevice()">➕ 添加设备</button>
+            <input type="text" id="devName" placeholder="设备名称">
+            <input type="text" id="devPrefix" placeholder="Topic前缀">
+            <button onclick="addDevice()">➕ 添加</button>
         </div>
     </div>
+
     <div id="deviceList"></div>
-    <div class="footer">MQTT 远程控制 · 添加设备后才能控制</div>
+    <div class="footer">MQTT远程控制 · 添加设备后生效</div>
 </div>
 <div id="toast" class="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js">
 </script>
 <script>
-    // ====== 自动选择 MQTT 端口 ======
+    // ====== MQTT 配置 ======
     const isHttps = window.location.protocol === 'https:';
     const BROKER = "broker-cn.emqx.io";
     const PORT = isHttps ? 8084 : 8083;
-    const CLIENT_ID = "web_multi_" + Math.random().toString(16).substr(2, 6);
+    const CLIENT_ID = "web_" + Math.random().toString(16).substr(2, 8);
 
     let devices = [];
     let client = null;
@@ -103,6 +116,7 @@
     const deviceListEl = document.getElementById('deviceList');
     const toast = document.getElementById('toast');
     const currentTimeEl = document.getElementById('currentTime');
+    const onlineCountEl = document.getElementById('onlineCount');
 
     // ====== Toast ======
     function showToast(msg) {
@@ -122,17 +136,18 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    // ================================================================
-    // 核心修改：默认设备列表为空，用户必须手动添加
-    // ================================================================
+    // ====== 设备数据管理 ======
     function loadDevices() {
         try {
             const stored = localStorage.getItem('multi_devices');
             if (stored) {
                 devices = JSON.parse(stored);
             } else {
-                // 默认设备列表为空
-                devices = [];
+                // 默认示例设备
+                devices = [
+                    { name: '插座1', prefix: 'z9f3h7k2m6n6', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } },
+                    { name: '插座2', prefix: 'a7k2p9q5m4n9', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } }
+                ];
                 saveDevices();
             }
             devices.forEach(dev => {
@@ -142,21 +157,30 @@
                 if (!dev.timers) dev.timers = [];
                 if (dev.online === undefined) dev.online = false;
                 if (!dev.progress) dev.progress = { stage: 0, msg: '等待启动...' };
+                if (!dev.room) dev.room = '未选择';
+                if (!dev.type) dev.type = '插座';
             });
         } catch (e) { devices = []; }
+        updateOnlineCount();
     }
 
     function saveDevices() {
         localStorage.setItem('multi_devices', JSON.stringify(devices));
+        updateOnlineCount();
+    }
+
+    function updateOnlineCount() {
+        const count = devices.filter(d => d.online).length;
+        onlineCountEl.textContent = count;
     }
 
     // ====== 添加设备 ======
     function addDevice() {
         const name = document.getElementById('devName').value.trim();
         const prefix = document.getElementById('devPrefix').value.trim();
-        if (!name || !prefix) { showToast('请输入设备名称和Topic前缀'); return; }
+        if (!name || !prefix) { showToast('请输入名称和Topic前缀'); return; }
         if (devices.some(d => d.prefix === prefix)) { showToast('该前缀已存在'); return; }
-        devices.push({ name, prefix, state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } });
+        devices.push({ name, prefix, room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } });
         saveDevices();
         document.getElementById('devName').value = '';
         document.getElementById('devPrefix').value = '';
@@ -165,25 +189,21 @@
         subscribeDevice(devices[devices.length - 1]);
     }
 
-    // ====== 删除设备 ======
     function removeDevice(index) {
         if (!confirm('删除设备 "' + devices[index].name + '" ？')) return;
         devices.splice(index, 1);
         saveDevices();
         renderDevices();
-        showToast('已删除设备');
+        showToast('已删除');
     }
 
-    // ====== 重命名功能 ======
+    // ====== 重命名 ======
     function startRename(idx) {
         editingIndex = idx;
         renderDevices();
         setTimeout(() => {
             const input = document.getElementById('rename_input_' + idx);
-            if (input) {
-                input.focus();
-                input.select();
-            }
+            if (input) { input.focus(); input.select(); }
         }, 100);
     }
 
@@ -191,31 +211,21 @@
         const input = document.getElementById('rename_input_' + idx);
         if (!input) return;
         const newName = input.value.trim();
-        if (!newName) {
-            showToast('⚠️ 名称不能为空');
-            return;
-        }
+        if (!newName) { showToast('名称不能为空'); return; }
         devices[idx].name = newName;
         saveDevices();
         editingIndex = null;
         renderDevices();
-        showToast('✅ 已重命名为：' + newName);
+        showToast('✅ 已重命名');
     }
 
-    function cancelRename() {
-        editingIndex = null;
-        renderDevices();
-    }
-
+    function cancelRename() { editingIndex = null; renderDevices(); }
     function handleRenameKeydown(e, idx) {
-        if (e.key === 'Enter') {
-            saveRename(idx);
-        } else if (e.key === 'Escape') {
-            cancelRename();
-        }
+        if (e.key === 'Enter') saveRename(idx);
+        else if (e.key === 'Escape') cancelRename();
     }
 
-    // ====== 生成主题 ======
+    // ====== 主题生成 ======
     function getTopics(prefix) {
         return {
             control: prefix + '/esp01s/ctrl',
@@ -242,13 +252,11 @@
                 devices.forEach(dev => subscribeDevice(dev));
             },
             onFailure: (err) => {
-                showToast('❌ MQTT 连接失败，请检查网络');
+                showToast('❌ MQTT 连接失败');
                 console.error(err);
             }
         };
-        if (isHttps) {
-            connectOptions.useSSL = true;
-        }
+        if (isHttps) connectOptions.useSSL = true;
         client.connect(connectOptions);
 
         client.onMessageArrived = (message) => {
@@ -272,19 +280,16 @@
                         showToast('🔴 ' + dev.name + ' 已离线');
                     }
                     renderDevices();
+                    updateOnlineCount();
                     return;
                 }
 
                 if (!devices[idx].online) return;
 
                 if (suffix === 'esp01s/progress') {
-                    try {
-                        devices[idx].progress = JSON.parse(payload);
-                        renderDevices();
-                    } catch(e) {}
+                    try { devices[idx].progress = JSON.parse(payload); renderDevices(); } catch(e) {}
                     return;
                 }
-
                 if (suffix === 'esp01s/stat') {
                     if (payload === 'ON' || payload === 'OFF') {
                         devices[idx].state = payload;
@@ -300,9 +305,7 @@
             });
         };
 
-        client.onConnectionLost = () => {
-            showToast('⚠️ MQTT 连接断开');
-        };
+        client.onConnectionLost = () => { showToast('⚠️ MQTT 断开'); };
     }
 
     function subscribeDevice(dev) {
@@ -316,10 +319,7 @@
         client.subscribe(topics.timerList);
     }
 
-    // ============================================================
     // ====== 渲染设备卡片 ======
-    // ============================================================
-
     function renderDevices() {
         if (devices.length === 0) {
             deviceListEl.innerHTML = '<p class="empty-msg">暂无设备，请添加</p>';
@@ -330,10 +330,9 @@
             const isOnline = dev.online || false;
             const cardClass = isOnline ? '' : 'offline';
             const state = dev.state || 'UNKNOWN';
-            const stateText = state === 'ON' ? '开启' : (state === 'OFF' ? '关闭' : (isOnline ? '未知' : '离线'));
-            const stateClass = state === 'ON' ? 'on' : (state === 'OFF' ? 'off' : (isOnline ? 'unknown' : 'offline-text'));
+            const stateText = state === 'ON' ? '已开启' : (state === 'OFF' ? '已关闭' : (isOnline ? '未知' : '离线'));
+            const stateClass = state === 'ON' ? 'on' : 'off';
             const checked = state === 'ON' ? 'checked' : '';
-
             const wifi = dev.wifiInfo || {};
             const sys = dev.sysInfo || {};
             const uptimeStr = sys.uptime ? Math.floor(sys.uptime/3600)+'h '+Math.floor((sys.uptime%3600)/60)+'m' : '--';
@@ -345,11 +344,11 @@
             const timers = dev.timers || [];
             let timersHtml = '';
             if (timers.length === 0) {
-                timersHtml = '<p style="color:#999;font-size:13px;">暂无定时任务</p>';
+                timersHtml = '<div style="color:#bbb;font-size:13px;padding:4px 0;">暂无定时任务</div>';
             } else {
                 timers.forEach((t, ti) => {
                     const actionText = t.action === 'ON' ? '开' : '关';
-                    const remain = t.remain !== undefined ? `(剩余 ${t.remain}s)` : '';
+                    const remain = t.remain !== undefined ? `(${t.remain}s)` : '';
                     timersHtml += `<div class="timer-item">
                         <span>${t.year}-${String(t.month).padStart(2,'0')}-${String(t.day).padStart(2,'0')} ${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')} → ${actionText} ${remain}</span>
                         <button class="btn-cancel" onclick="removeTimer(${idx}, ${ti})">取消</button>
@@ -357,20 +356,21 @@
                 });
             }
 
+            // 名称编辑
             let nameHtml = '';
             if (editingIndex === idx) {
                 nameHtml = `
-                    <span class="name-area">
-                        <input class="rename-input" id="rename_input_${idx}" type="text" value="${dev.name}" 
-                               onkeydown="handleRenameKeydown(event, ${idx})">
-                        <button class="save-btn" onclick="saveRename(${idx})">保存</button>
+                    <span class="device-name">
+                        <input id="rename_input_${idx}" type="text" value="${dev.name}" 
+                               onkeydown="handleRenameKeydown(event, ${idx})" style="border:none;border-bottom:2px solid #667eea;font-size:16px;font-weight:600;outline:none;width:auto;background:transparent;">
+                        <button class="edit-btn" onclick="saveRename(${idx})" style="color:#4caf50;">✓</button>
                         <button class="edit-btn" onclick="cancelRename()" style="color:#f44336;">✕</button>
                     </span>
                 `;
             } else {
                 nameHtml = `
-                    <span class="name-area">
-                        <span>${dev.name}</span>
+                    <span class="device-name">
+                        ${dev.name}
                         <button class="edit-btn" onclick="startRename(${idx})">✏️</button>
                     </span>
                 `;
@@ -378,48 +378,53 @@
 
             html += `
             <div class="device-card ${cardClass}" id="card-${idx}">
-                <div class="device-title">
-                    ${nameHtml}
-                    <span class="badge">${dev.prefix}</span>
+                <div class="card-header">
+                    <div class="left">
+                        <div class="icon">${dev.type === '空调' ? '❄️' : '🔌'}</div>
+                        <div class="name-area">
+                            ${nameHtml}
+                            <span class="room-tag">${dev.room || '未选择'}</span>
+                        </div>
+                    </div>
+                    <div class="right">
+                        <span class="status-dot ${isOnline ? 'online' : 'offline'}"></span>
+                        <span class="status-text">${isOnline ? '在线' : '离线'}</span>
+                    </div>
                 </div>
+
                 ${isOnline ? `
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width:${pct}%;"></div>
+                    <div class="switch-area">
+                        <span class="state-label ${stateClass}">${stateText}</span>
+                        <label class="switch">
+                            <input type="checkbox" ${checked} onchange="toggleDevice(${idx}, this.checked)">
+                            <span class="slider"></span>
+                        </label>
                     </div>
-                    <div class="progress-text">${progress.msg || '启动中...'}</div>
-                ` : `
-                    <div style="color:#999;font-size:14px;margin:10px 0;">⏳ 设备离线，等待上线...</div>
-                `}
-                <div class="device-status">
-                    <label class="switch">
-                        <input type="checkbox" ${checked} onchange="toggleDevice(${idx}, this.checked)" ${!isOnline ? 'disabled' : ''}>
-                        <span class="slider"></span>
-                    </label>
-                    <span class="state-label ${stateClass}">${stateText}</span>
-                </div>
-                ${isOnline ? `
-                    <div class="device-info">
-                        📶 ${wifi.ssid || '--'} 信号: ${wifi.rssi || '--'} dBm 
-                        ${wifi.ip ? '| IP: '+wifi.ip : ''}
+                    <div class="info-row">
+                        <span>📶 ${wifi.ssid || '--'} 信号: ${wifi.rssi || '--'} dBm</span>
+                        <span>🖥️ ${wifi.ip || '--'}</span>
+                        <span>⏱ ${uptimeStr}</span>
                     </div>
-                    <div class="device-info">
-                        💾 内存: ${sys.free_heap || '--'}B | 碎片: ${sys.heap_frag || '--'}% | 运行: ${uptimeStr}
-                        <br>🔄 重启原因: ${resetReason}
+                    <div class="info-row" style="font-size:12px; color:#999; background:#f5f5f5;">
+                        💾 内存: ${sys.free_heap || '--'}B · 碎片: ${sys.heap_frag || '--'}% · 重启: ${resetReason}
                     </div>
                 ` : `
-                    <div class="device-info" style="color:#999;">设备离线，信息已清除</div>
+                    <div style="color:#bbb;font-size:14px;margin:12px 0;">⏳ 设备离线，等待上线...</div>
                 `}
-                <div class="device-actions">
-                    <button class="btn-reset" onclick="resetWiFi(${idx})" ${!isOnline ? 'disabled' : ''}>🔄 更换WiFi</button>
+
+                <div class="action-row">
+                    <button class="btn-timer" onclick="document.getElementById('timer_section_${idx}').style.display='block'" ${!isOnline ? 'disabled' : ''}>⏱ 定时</button>
+                    <button class="btn-reset" onclick="resetWiFi(${idx})" ${!isOnline ? 'disabled' : ''}>🔄 重置WiFi</button>
                     <button class="btn-restart" onclick="restartDevice(${idx})" ${!isOnline ? 'disabled' : ''}>🔁 重启</button>
                     <button class="btn-del" onclick="removeDevice(${idx})">🗑️ 删除</button>
                 </div>
-                <div class="timer-section">
+
+                <div class="timer-section" id="timer_section_${idx}" style="display:none;">
                     <div class="timer-input">
-                        <input type="datetime-local" id="dt_${idx}" ${!isOnline ? 'disabled' : ''}>
-                        <button class="btn-on" onclick="addTimer(${idx}, 'ON')" ${!isOnline ? 'disabled' : ''}>开</button>
-                        <button class="btn-off" onclick="addTimer(${idx}, 'OFF')" ${!isOnline ? 'disabled' : ''}>关</button>
-                        <button class="btn-refresh" onclick="refreshTimers(${idx})" ${!isOnline ? 'disabled' : ''}>🔄 刷新</button>
+                        <input type="datetime-local" id="dt_${idx}">
+                        <button class="btn-timer-on" onclick="addTimer(${idx}, 'ON')">开</button>
+                        <button class="btn-timer-off" onclick="addTimer(${idx}, 'OFF')">关</button>
+                        <button class="btn-refresh" onclick="refreshTimers(${idx})">🔄</button>
                     </div>
                     <div class="timer-list">${timersHtml}</div>
                 </div>
@@ -428,10 +433,7 @@
         deviceListEl.innerHTML = html;
     }
 
-    // ============================================================
     // ====== 控制函数 ======
-    // ============================================================
-
     function toggleDevice(idx, checked) {
         const dev = devices[idx];
         if (!client || !client.isConnected()) { showToast('⚠️ MQTT 未连接'); return; }
@@ -445,7 +447,7 @@
     }
 
     function resetWiFi(idx) {
-        if (!confirm('确定重置 '+devices[idx].name+' 的WiFi配置？')) return;
+        if (!confirm('重置 '+devices[idx].name+' 的WiFi配置？')) return;
         const dev = devices[idx];
         const topic = getTopics(dev.prefix).reset;
         const msg = new Paho.MQTT.Message('RESET');
@@ -455,7 +457,7 @@
     }
 
     function restartDevice(idx) {
-        if (!confirm('确定重启 '+devices[idx].name+' ？')) return;
+        if (!confirm('重启 '+devices[idx].name+' ？')) return;
         const dev = devices[idx];
         const topic = getTopics(dev.prefix).restart;
         const msg = new Paho.MQTT.Message('RESTART');
@@ -470,7 +472,7 @@
         const msg = new Paho.MQTT.Message('');
         msg.destinationName = topic;
         client.send(msg);
-        showToast('🔄 正在获取定时列表');
+        showToast('🔄 刷新定时');
     }
 
     function addTimer(idx, action) {
@@ -480,11 +482,8 @@
         const datePart = parts[0], timePart = parts[1];
         if (!datePart || !timePart) { showToast('格式错误'); return; }
         const dateArr = datePart.split('-'), timeArr = timePart.split(':');
-        const year = parseInt(dateArr[0]);
-        const month = parseInt(dateArr[1]);
-        const day = parseInt(dateArr[2]);
-        const hour = parseInt(timeArr[0]);
-        const minute = parseInt(timeArr[1]);
+        const year = parseInt(dateArr[0]), month = parseInt(dateArr[1]), day = parseInt(dateArr[2]);
+        const hour = parseInt(timeArr[0]), minute = parseInt(timeArr[1]);
         if (isNaN(year)||isNaN(month)||isNaN(day)||isNaN(hour)||isNaN(minute)) { showToast('输入无效'); return; }
         const payload = { year, month, day, hour, minute, action };
         const dev = devices[idx];
@@ -492,7 +491,7 @@
         const msg = new Paho.MQTT.Message(JSON.stringify(payload));
         msg.destinationName = topic;
         client.send(msg);
-        showToast(`📤 已发送定时 ${action==='ON'?'开':'关'}`);
+        showToast(`📤 定时 ${action==='ON'?'开':'关'}`);
     }
 
     function removeTimer(idx, timerIndex) {
@@ -505,17 +504,13 @@
         const msg = new Paho.MQTT.Message(String(realIndex));
         msg.destinationName = topic;
         client.send(msg);
-        showToast('📤 已发送删除指令');
+        showToast('已删除定时');
     }
 
-    // ============================================================
     // ====== 初始化 ======
-    // ============================================================
-
     loadDevices();
     renderDevices();
     connectMQTT();
-
     window.addEventListener('beforeunload', () => saveDevices());
 </script>
 </body>
