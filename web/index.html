@@ -107,7 +107,6 @@
     let devices = [];
     let client = null;
     let editingIndex = null;
-    // ====== 新增：记录定时区域展开状态 ======
     let timerExpanded = {};
 
     const deviceListEl = document.getElementById('deviceList');
@@ -131,13 +130,23 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    // ====== 新增：本地重新计算剩余时间 ======
+    // ========== 核心：计算剩余秒数（每日循环使用当前日期） ==========
     function calcRemainSeconds(timer) {
         const now = new Date();
-        // 构造目标时间
-        const target = new Date(timer.year, timer.month - 1, timer.day, timer.hour, timer.minute, 0);
-        const diff = Math.floor((target - now) / 1000);
-        return diff > 0 ? diff : 0;
+        if (timer.repeat) {
+            // 每日循环：基于今天的时分计算到下次触发的秒数
+            let target = new Date(now);
+            target.setHours(timer.hour, timer.minute, 0, 0);
+            if (target <= now) {
+                target.setDate(target.getDate() + 1);
+            }
+            return Math.floor((target - now) / 1000);
+        } else {
+            // 单次定时：使用设备上报的日期
+            const target = new Date(timer.year, timer.month - 1, timer.day, timer.hour, timer.minute, 0);
+            const diff = Math.floor((target - now) / 1000);
+            return diff > 0 ? diff : 0;
+        }
     }
 
     function loadDevices() {
@@ -299,9 +308,7 @@
                 } else if (suffix === 'esp01s/tlst') {
                     try {
                         const timers = JSON.parse(payload);
-                        // 保留设备端上报的定时数据，但 remain 我们本地重新计算
                         devices[idx].timers = timers.map(t => {
-                            // 如果设备端没有上报 repeat 字段，默认为 false
                             if (t.repeat === undefined) t.repeat = false;
                             return t;
                         });
@@ -325,7 +332,7 @@
         client.subscribe(topics.timerList);
     }
 
-    // ====== 渲染设备卡片（修复：保持定时区域状态） ======
+    // ====== 渲染设备卡片 ======
     function renderDevices() {
         if (devices.length === 0) {
             deviceListEl.innerHTML = '<p class="empty-msg">暂无设备，请添加</p>';
@@ -351,7 +358,6 @@
             } else {
                 timers.forEach((t, ti) => {
                     const actionText = t.action === 'ON' ? '开' : '关';
-                    // ====== 本地重新计算剩余时间 ======
                     const remain = calcRemainSeconds(t);
                     const repeatBadge = t.repeat ? '<span class="repeat-badge">🔄每天</span>' : '';
                     timersHtml += `<div class="timer-item">
@@ -380,7 +386,6 @@
                 `;
             }
 
-            // ====== 检查定时区域是否应该展开 ======
             const isExpanded = timerExpanded[idx] || false;
             const displayStyle = isExpanded ? 'block' : 'none';
 
@@ -444,11 +449,10 @@
         deviceListEl.innerHTML = html;
     }
 
-    // ====== 新增：切换定时区域展开状态 ======
+    // ====== 切换定时区域展开 ======
     function toggleTimerSection(idx) {
         timerExpanded[idx] = !timerExpanded[idx];
         renderDevices();
-        // 如果展开，聚焦到时间输入框
         if (timerExpanded[idx]) {
             setTimeout(() => {
                 const input = document.getElementById('dt_time_' + idx);
@@ -457,9 +461,8 @@
         }
     }
 
-    // ====== 每秒刷新定时列表的剩余时间 ======
+    // ====== 每秒更新剩余时间（只更新定时列表，不重绘全卡片） ======
     function refreshTimerRemains() {
-        // 遍历所有设备，更新定时列表显示
         devices.forEach((dev, idx) => {
             const listEl = document.getElementById('timer_list_' + idx);
             if (!listEl) return;
@@ -482,9 +485,10 @@
         });
     }
 
-    // 每秒刷新剩余时间
+    // 每秒刷新一次剩余时间
     setInterval(refreshTimerRemains, 1000);
 
+    // ====== 控制函数 ======
     function toggleDevice(idx, checked) {
         const dev = devices[idx];
         if (!client || !client.isConnected()) { showToast('⚠️ MQTT 未连接'); return; }
@@ -526,6 +530,7 @@
         showToast('🔄 刷新定时');
     }
 
+    // ====== 添加定时（只发MQTT，不主动刷新，等设备回复） ======
     function addTimer(idx, action) {
         const timeInput = document.getElementById('dt_time_'+idx);
         const repeatCheck = document.getElementById('dt_repeat_'+idx);
@@ -566,12 +571,12 @@
         client.send(msg);
         showToast(`📤 定时 ${action==='ON'?'开':'关'} ${repeat ? '(每天)' : '(单次)'}`);
         
-        // 添加定时后保持定时区域展开
+        // 保持定时区域展开（设备回复后会重新渲染）
         timerExpanded[idx] = true;
-        // 等待设备回复后刷新列表
-        setTimeout(() => refreshTimers(idx), 500);
+        // 不需要主动刷新，等待设备回复 timerList
     }
 
+    // ====== 删除定时（只发MQTT） ======
     function removeTimer(idx, timerIndex) {
         if (!confirm('取消该定时任务？')) return;
         const dev = devices[idx];
@@ -583,9 +588,8 @@
         msg.destinationName = topic;
         client.send(msg);
         showToast('已删除定时');
-        // 删除后保持定时区域展开
         timerExpanded[idx] = true;
-        setTimeout(() => refreshTimers(idx), 500);
+        // 等待设备回复
     }
 
     loadDevices();
