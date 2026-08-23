@@ -29,7 +29,30 @@
         .card-header .left .name-area .device-name { font-size: 17px; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 6px; }
         .card-header .left .name-area .device-name .edit-btn { background: none; border: none; font-size: 14px; color: #ccc; cursor: pointer; padding: 0 4px; }
         .card-header .left .name-area .device-name .edit-btn:hover { color: #667eea; }
-        .card-header .left .name-area .room-tag { font-size: 12px; color: #999; background: #f5f5f5; padding: 0 12px; border-radius: 12px; display: inline-block; margin-top: 2px; width: fit-content; }
+        .card-header .left .name-area .topic-tag { 
+            font-size: 11px; 
+            color: #667eea; 
+            background: #eef0ff; 
+            padding: 0 10px; 
+            border-radius: 12px; 
+            display: inline-block; 
+            margin-top: 2px; 
+            width: fit-content; 
+            max-width: 160px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .card-header .left .name-area .room-tag { 
+            font-size: 12px; 
+            color: #999; 
+            background: #f5f5f5; 
+            padding: 0 12px; 
+            border-radius: 12px; 
+            display: inline-block; 
+            margin-top: 2px; 
+            width: fit-content; 
+        }
         .card-header .right .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
         .card-header .right .status-dot.online { background: #4caf50; }
         .card-header .right .status-dot.offline { background: #f44336; }
@@ -141,9 +164,8 @@
             if (stored) {
                 devices = JSON.parse(stored);
             } else {
-                devices = [
-                    { name: '热水器', prefix: 'z9f3h7k2m6n8', room: '未选择', type: '插座', state: 'UNKNOWN', wifiInfo: null, sysInfo: null, timers: [], online: false, progress: { stage: 0, msg: '等待启动...' } }
-                ];
+                // 不再硬编码默认设备，初始为空数组
+                devices = [];
                 saveDevices();
             }
             devices.forEach(dev => {
@@ -379,7 +401,10 @@
                         <div class="icon">${dev.type === '空调' ? '❄️' : '🔌'}</div>
                         <div class="name-area">
                             ${nameHtml}
-                            <span class="room-tag">${dev.room || '未选择'}</span>
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+                                <span class="topic-tag" title="Topic前缀: ${dev.prefix}">📌 ${dev.prefix}</span>
+                                <span class="room-tag">${dev.room || '未选择'}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="right">
