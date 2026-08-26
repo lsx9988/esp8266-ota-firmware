@@ -74,9 +74,8 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
 </head>
 <body>
 <div class="container">
-    <!-- 顶栏 -->
     <div class="top-bar">
-        <div><h1>📱 ST280G 远程监控 <span class="subtitle">自动同步名称</span></h1></div>
+        <div><h1>📱 ST280G 远程监控 <span class="subtitle">自动同步</span></h1></div>
         <div class="status-badge">
             <span class="status-dot disconnected" id="mqttStatusDot"></span>
             <span id="mqttStatusText">MQTT: 未连接</span>
@@ -122,7 +121,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                     <label>间隔 <input type="number" id="pollInterval" value="1000" min="500" step="100" style="width:70px;"> ms</label>
                     <button class="btn btn-sm btn-primary" id="btnApplyPoll">应用</button>
                 </div>
-                <div style="font-size:12px;color:#888;margin-top:4px;">设置后本地端自动轮询会立即生效</div>
+                <div style="font-size:12px;color:#888;margin-top:4px;">设置后本地端自动轮询立即生效</div>
             </div>
 
             <!-- 快速遥控 -->
@@ -467,7 +466,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                 log(`📨 收到消息 (${topic})`, 'log-info');
                 try {
                     const data = JSON.parse(payload);
-                    // ===== 新增：自动同步点表名称 =====
+                    // ===== 自动同步点表名称 =====
                     if (data.yx_names && data.yx_names.length === YX_COUNT) {
                         pointNames.yx = data.yx_names;
                         saveNamesToStorage();
@@ -585,7 +584,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
     // 初始化
     renderParse();
     renderSOE();
-    log('📱 ST280G 远程监控（自动同步名称）已加载', 'log-info');
+    log('📱 ST280G 远程监控（自动同步）已加载', 'log-info');
     log('💡 连接MQTT后自动接收数据并同步点表名称', 'log-info');
 
     window.__debug = { mqttConnect, mqttDisconnect, sendCommand };
