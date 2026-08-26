@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ST280G 远程监控 · 自动同步</title>
+<title>ST280G 远程监控 · 增量接收</title>
 <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/5.3.5/mqtt.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -75,7 +75,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
 <body>
 <div class="container">
     <div class="top-bar">
-        <div><h1>📱 ST280G 远程监控 <span class="subtitle">自动同步</span></h1></div>
+        <div><h1>📱 ST280G 远程监控 <span class="subtitle">增量接收</span></h1></div>
         <div class="status-badge">
             <span class="status-dot disconnected" id="mqttStatusDot"></span>
             <span id="mqttStatusText">MQTT: 未连接</span>
@@ -83,7 +83,6 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
     </div>
     <div class="grid-2col">
         <div>
-            <!-- MQTT 连接 -->
             <div class="card">
                 <div class="card-title">🌐 MQTT 连接 <span class="badge">中国区 Broker</span></div>
                 <div class="mqtt-panel">
@@ -91,7 +90,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                         <label>服务器</label>
                         <input type="text" id="mqttBroker" value="wss://broker.emqx.io:8084/mqtt" style="width:180px;">
                         <label>ClientID</label>
-                        <input type="text" id="mqttClientId" value="st280g_remote_xxxx" style="width:120px;" placeholder="自动生成">
+                        <input type="text" id="mqttClientId" style="width:120px;" readonly>
                     </div>
                     <div class="form-row">
                         <label>用户名</label>
@@ -112,8 +111,6 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                     </div>
                 </div>
             </div>
-
-            <!-- 轮询控制 -->
             <div class="card">
                 <div class="card-title">🔄 轮询控制 <span class="badge">远程设置</span></div>
                 <div class="form-row">
@@ -123,8 +120,6 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                 </div>
                 <div style="font-size:12px;color:#888;margin-top:4px;">设置后本地端自动轮询立即生效</div>
             </div>
-
-            <!-- 快速遥控 -->
             <div class="card">
                 <div class="card-title">⚡ 快速遥控 <span class="badge">一键操作</span></div>
                 <div class="btn-group">
@@ -133,8 +128,6 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                 </div>
                 <div style="font-size:12px;color:#888;margin-top:4px;">使用本地端预设的预令和动令值</div>
             </div>
-
-            <!-- 其他命令 -->
             <div class="card">
                 <div class="card-title">🎯 其他命令</div>
                 <div class="btn-group">
@@ -146,9 +139,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
                     <button class="btn btn-warning btn-sm" id="btnReadSOE">📋 读SOE</button>
                 </div>
             </div>
-            <!-- 传统遥控和自定义帧已移除 -->
         </div>
-        <!-- 右栏：数据展示 -->
         <div>
             <div class="card">
                 <div class="card-title flex-between">
@@ -184,7 +175,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
 <div class="toast" id="toast"></div>
 
 <script>
-(function(){
+(function() {
     'use strict';
 
     // ---------- DOM ----------
@@ -249,13 +240,16 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
     let mqttClient = null;
     let mqttConnected = false;
 
-    // 工具
+    // ========== 每次打开页面重新生成 Client ID ==========
     function generateClientId() {
-        return 'st280g_remote_' + Math.random().toString(16).substring(2, 10);
+        return 'st280g_remote_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
     }
-    if (!mqttClientId.value || mqttClientId.value === 'st280g_remote_xxxx') {
+    (function initClientId() {
         mqttClientId.value = generateClientId();
-    }
+        mqttClientId.readOnly = true;
+        mqttClientId.style.cursor = 'default';
+        mqttClientId.title = '每次打开页面自动生成，不可手动修改';
+    })();
 
     // Toast
     let toastTimer=null;
@@ -263,7 +257,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
         toast.textContent=msg;
         toast.className='toast '+type+' show';
         clearTimeout(toastTimer);
-        toastTimer=setTimeout(()=>{ toast.className='toast'; }, 3000);
+        toastTimer=setTimeout(()=>{ toast.className='toast'; },3000);
     }
 
     // 日志
@@ -301,108 +295,98 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
     }
 
     function formatSOETime(soe) {
-        return `${soe.year}-${String(soe.month).padStart(2,'0')}-${String(soe.day).padStart(2,'0')} ` +
+        return `${soe.year}-${String(soe.month).padStart(2,'0')}-${String(soe.day).padStart(2,'0')} `+
                `${String(soe.hour).padStart(2,'0')}:${String(soe.min).padStart(2,'0')}:${String(soe.sec).padStart(2,'0')}.${String(soe.ms).padStart(3,'0')}`;
     }
 
     function renderSOE() {
-        if (soeEvents.length === 0) {
-            soeContainer.innerHTML = '<div class="empty-hint">暂无事件</div>';
-            soeCount.textContent = '(0)';
-            return;
+        if(soeEvents.length===0){ soeContainer.innerHTML='<div class="empty-hint">暂无事件</div>'; soeCount.textContent='(0)'; return; }
+        let html='';
+        for(const soe of soeEvents){
+            const timeStr=formatSOETime(soe);
+            const yxLabel=(soe.yx_index>=0&&soe.yx_index<YX_COUNT)?(pointNames.yx[soe.yx_index]||`YX${soe.yx_index+1}`):'—';
+            const yxVal=soe.yx_value?'合':'分';
+            const idxDisplay=(soe.yx_index>=0&&soe.yx_index<YX_COUNT)?`#${soe.yx_index+1}`:'';
+            html+=`<div class="soe-item"><span><span class="time">${timeStr}</span> &nbsp;|&nbsp; <span class="desc">${soe.desc||'未知事件'}</span></span><span><span class="yx">${yxLabel} → ${yxVal}</span> <span class="idx-badge">${idxDisplay}</span></span></div>`;
         }
-        let html = '';
-        for (const soe of soeEvents) {
-            const timeStr = formatSOETime(soe);
-            const yxLabel = (soe.yx_index >= 0 && soe.yx_index < YX_COUNT) ? 
-                (pointNames.yx[soe.yx_index] || `YX${soe.yx_index+1}`) : '—';
-            const yxVal = soe.yx_value ? '合' : '分';
-            const idxDisplay = (soe.yx_index >= 0 && soe.yx_index < YX_COUNT) ? `#${soe.yx_index+1}` : '';
-            html += `<div class="soe-item">
-                <span><span class="time">${timeStr}</span> &nbsp;|&nbsp; <span class="desc">${soe.desc||'未知事件'}</span></span>
-                <span><span class="yx">${yxLabel} → ${yxVal}</span> <span class="idx-badge">${idxDisplay}</span></span>
-            </div>`;
-        }
-        soeContainer.innerHTML = html;
-        soeCount.textContent = `(${soeEvents.length})`;
+        soeContainer.innerHTML=html;
+        soeCount.textContent=`(${soeEvents.length})`;
     }
 
     function addSOE(soe) {
         soeEvents.unshift(soe);
-        if (soeEvents.length > MAX_SOE) soeEvents = soeEvents.slice(0, MAX_SOE);
+        if(soeEvents.length>MAX_SOE) soeEvents=soeEvents.slice(0,MAX_SOE);
         renderSOE();
     }
 
     function clearSOE() {
-        soeEvents = [];
+        soeEvents=[];
         renderSOE();
-        log('🗑️ SOE事件已清空', 'log-info');
-        showToast('SOE事件已清空', 'info');
+        log('🗑️ SOE事件已清空','log-info');
+        showToast('SOE事件已清空','info');
     }
 
     function exportSOE() {
-        if (soeEvents.length === 0) { showToast('没有SOE事件可导出', 'error'); return; }
-        const lines = ['# ST280G SOE 事件导出'];
-        const now = new Date();
+        if(soeEvents.length===0){ showToast('没有SOE事件可导出','error'); return; }
+        const lines=['# ST280G SOE 事件导出'];
+        const now=new Date();
         lines.push(`# 导出时间: ${now.toISOString()}`);
         lines.push(`# 事件总数: ${soeEvents.length}`);
         lines.push('# 格式: 时间 | 事件描述 | YX编号(1-based) | 状态(合/分)');
-        for (const soe of soeEvents) {
-            const timeStr = formatSOETime(soe);
-            const desc = soe.desc || '未知事件';
-            const yxNum = (soe.yx_index >= 0 && soe.yx_index < YX_COUNT) ? (soe.yx_index + 1) : 0;
-            const status = soe.yx_value ? '合' : '分';
+        for(const soe of soeEvents){
+            const timeStr=formatSOETime(soe);
+            const desc=soe.desc||'未知事件';
+            const yxNum=(soe.yx_index>=0&&soe.yx_index<YX_COUNT)?(soe.yx_index+1):0;
+            const status=soe.yx_value?'合':'分';
             lines.push(`${timeStr} | ${desc} | ${yxNum} | ${status}`);
         }
-        const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `SOE_${now.toISOString().slice(0,10)}.txt`;
+        const blob=new Blob(['\uFEFF'+lines.join('\n')], {type:'text/plain;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url;
+        a.download=`SOE_${now.toISOString().slice(0,10)}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast(`导出 ${soeEvents.length} 条SOE事件成功`, 'success');
+        showToast(`导出 ${soeEvents.length} 条SOE事件成功`,'success');
     }
 
     function importSOE() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.txt,.csv';
-        input.onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(ev) {
+        const input=document.createElement('input');
+        input.type='file';
+        input.accept='.txt,.csv';
+        input.onchange=function(e){
+            const file=e.target.files[0];
+            if(!file) return;
+            const reader=new FileReader();
+            reader.onload=function(ev){
                 try {
-                    const content = ev.target.result;
-                    const lines = content.split(/\r?\n/);
-                    let count = 0, skipped = 0, imported = [];
-                    for (let line of lines) {
-                        line = line.trim();
-                        if (!line || line.startsWith('#')) continue;
-                        const parts = line.split('|').map(s => s.trim());
-                        if (parts.length < 4) { skipped++; continue; }
-                        const [timeStr, desc, yxNumStr, statusStr] = parts;
-                        const timeMatch = timeStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/);
-                        if (!timeMatch) { skipped++; continue; }
-                        const [, year, month, day, hour, min, sec, ms] = timeMatch.map(Number);
-                        let yxIndex = parseInt(yxNumStr) - 1;
-                        if (isNaN(yxIndex) || yxIndex < 0) yxIndex = -1;
-                        if (yxIndex >= YX_COUNT) yxIndex = YX_COUNT - 1;
-                        const yxValue = (statusStr === '合' || statusStr === '1' || statusStr === 'ON') ? 1 : 0;
-                        const soe = { year, month, day, hour, min, sec, ms, yx_index: yxIndex, yx_value: yxValue, desc: desc || '未知事件' };
+                    const content=ev.target.result;
+                    const lines=content.split(/\r?\n/);
+                    let count=0, skipped=0, imported=[];
+                    for(let line of lines){
+                        line=line.trim();
+                        if(!line || line.startsWith('#')) continue;
+                        const parts=line.split('|').map(s=>s.trim());
+                        if(parts.length<4){ skipped++; continue; }
+                        const [timeStr, desc, yxNumStr, statusStr]=parts;
+                        const timeMatch=timeStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/);
+                        if(!timeMatch){ skipped++; continue; }
+                        const [, year, month, day, hour, min, sec, ms]=timeMatch.map(Number);
+                        let yxIndex=parseInt(yxNumStr)-1;
+                        if(isNaN(yxIndex)||yxIndex<0) yxIndex=-1;
+                        if(yxIndex>=YX_COUNT) yxIndex=YX_COUNT-1;
+                        const yxValue=(statusStr==='合'||statusStr==='1'||statusStr==='ON')?1:0;
+                        const soe={ year, month, day, hour, min, sec, ms, yx_index:yxIndex, yx_value:yxValue, desc:desc||'未知事件' };
                         imported.push(soe);
                         count++;
                     }
-                    if (count === 0) { showToast('未解析到有效SOE事件', 'error'); return; }
-                    for (const soe of imported) addSOE(soe);
+                    if(count===0){ showToast('未解析到有效SOE事件','error'); return; }
+                    for(const soe of imported) addSOE(soe);
                     renderSOE();
-                    showToast(`成功导入 ${count} 条SOE事件${skipped > 0 ? `，跳过 ${skipped} 行` : ''}`, 'success');
-                } catch (err) {
-                    showToast('导入失败: ' + err.message, 'error');
-                }
+                    showToast(`成功导入 ${count} 条SOE事件${skipped>0?`，跳过 ${skipped} 行`:''}`,'success');
+                } catch(err){ showToast('导入失败: '+err.message,'error'); }
             };
             reader.readAsText(file);
         };
@@ -411,117 +395,143 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
 
     // MQTT
     function updateMqttUI(connected) {
-        mqttConnected = connected;
-        btnMqttConnect.disabled = connected;
-        btnMqttDisconnect.disabled = !connected;
-        mqttStateLabel.textContent = connected ? '已连接' : '未连接';
-        mqttStatusDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
-        mqttStatusText.textContent = 'MQTT: ' + (connected ? '已连接' : '未连接');
+        mqttConnected=connected;
+        btnMqttConnect.disabled=connected;
+        btnMqttDisconnect.disabled=!connected;
+        mqttStateLabel.textContent=connected?'已连接':'未连接';
+        mqttStatusDot.className='status-dot '+(connected?'connected':'disconnected');
+        mqttStatusText.textContent='MQTT: '+(connected?'已连接':'未连接');
     }
 
     async function mqttConnect() {
-        if (mqttConnected) return;
-        const broker = mqttBroker.value.trim();
-        if (!broker) { showToast('请输入MQTT服务器地址', 'error'); return; }
-        const clientId = mqttClientId.value.trim() || generateClientId();
-        const username = mqttUsername.value.trim() || undefined;
-        const password = mqttPassword.value.trim() || undefined;
+        if(mqttConnected) return;
+        const broker=mqttBroker.value.trim();
+        if(!broker){ showToast('请输入MQTT服务器地址','error'); return; }
+        const clientId=mqttClientId.value.trim()||generateClientId();
+        const username=mqttUsername.value.trim()||undefined;
+        const password=mqttPassword.value.trim()||undefined;
 
         try {
-            const options = {
-                clientId: clientId,
-                username: username,
-                password: password,
-                clean: true,
-                reconnectPeriod: 1000,
-                connectTimeout: 30 * 1000,
-                will: { topic: mqttPubTopic.value, payload: 'offline', qos: 0, retain: false }
+            const options={
+                clientId:clientId, username:username, password:password,
+                clean:true, reconnectPeriod:1000, connectTimeout:30*1000,
+                will:{ topic:mqttPubTopic.value, payload:'offline', qos:0, retain:false }
             };
-            mqttClient = mqtt.connect(broker, options);
+            mqttClient=mqtt.connect(broker, options);
 
-            mqttClient.on('connect', () => {
-                log('✅ MQTT 连接成功', 'log-info');
-                showToast('MQTT 已连接', 'success');
+            mqttClient.on('connect', ()=>{
+                log('✅ MQTT 连接成功','log-info');
+                showToast('MQTT 已连接','success');
                 updateMqttUI(true);
-                // 订阅数据主题
-                const dataTopic = mqttPubTopic.value.trim();
-                if (dataTopic) {
-                    mqttClient.subscribe(dataTopic, { qos: 1 }, (err) => {
-                        if (err) logErr('订阅数据主题失败: ' + err.message);
-                        else log(`📡 已订阅数据主题: ${dataTopic}`, 'log-info');
+                const dataTopic=mqttPubTopic.value.trim();
+                if(dataTopic){
+                    mqttClient.subscribe(dataTopic, {qos:1}, (err)=>{
+                        if(err) logErr('订阅数据主题失败: '+err.message);
+                        else log(`📡 已订阅数据主题: ${dataTopic}`,'log-info');
                     });
                 }
-                // 订阅命令主题（用于接收响应）
-                const subTopic = mqttSubTopic.value.trim();
-                if (subTopic) {
-                    mqttClient.subscribe(subTopic, { qos: 1 }, (err) => {
-                        if (err) logErr('订阅命令主题失败: ' + err.message);
-                        else log(`📡 已订阅命令主题: ${subTopic}`, 'log-info');
+                const subTopic=mqttSubTopic.value.trim();
+                if(subTopic){
+                    mqttClient.subscribe(subTopic, {qos:1}, (err)=>{
+                        if(err) logErr('订阅命令主题失败: '+err.message);
+                        else log(`📡 已订阅命令主题: ${subTopic}`,'log-info');
                     });
                 }
             });
 
-            mqttClient.on('message', (topic, message) => {
-                const payload = message.toString();
-                log(`📨 收到消息 (${topic})`, 'log-info');
+            // ========== 核心：处理收到消息（支持完整和增量） ==========
+            mqttClient.on('message', (topic, message)=>{
+                const payload=message.toString();
+                log(`📨 收到消息 (${topic})`,'log-info');
                 try {
-                    const data = JSON.parse(payload);
-                    // ===== 自动同步点表名称 =====
-                    if (data.yx_names && data.yx_names.length === YX_COUNT) {
-                        pointNames.yx = data.yx_names;
+                    const data=JSON.parse(payload);
+                    // 点表名称同步
+                    if(data.yx_names && data.yx_names.length===YX_COUNT){
+                        pointNames.yx=data.yx_names;
                         saveNamesToStorage();
-                        log('📝 遥信名称已同步', 'log-data');
+                        log('📝 遥信名称已同步','log-data');
                     }
-                    if (data.yc_names && data.yc_names.length === YC_COUNT) {
-                        pointNames.yc = data.yc_names;
+                    if(data.yc_names && data.yc_names.length===YC_COUNT){
+                        pointNames.yc=data.yc_names;
                         saveNamesToStorage();
-                        log('📝 遥测名称已同步', 'log-data');
+                        log('📝 遥测名称已同步','log-data');
                     }
-                    // 更新数据
-                    if (data.yx && data.yx.length === YX_COUNT) {
-                        yxValues = data.yx.slice();
+
+                    // 处理完整数据
+                    if(data.full===true){
+                        if(data.yx && data.yx.length===YX_COUNT){
+                            yxValues=data.yx.slice();
+                        }
+                        if(data.yc && data.yc.length===YC_COUNT){
+                            ycValues=data.yc.slice();
+                        }
                         renderParse();
-                    }
-                    if (data.yc && data.yc.length === YC_COUNT) {
-                        ycValues = data.yc.slice();
-                        renderParse();
-                    }
-                    if (data.soe && Array.isArray(data.soe)) {
-                        for (const s of data.soe) {
-                            const exists = soeEvents.some(e => e.year===s.year && e.month===s.month && e.day===s.day && e.hour===s.hour && e.min===s.min && e.sec===s.sec && e.ms===s.ms && e.desc===s.desc);
-                            if (!exists) addSOE(s);
+                        log('📊 完整数据已更新','log-data');
+                    } else {
+                        // 增量数据
+                        let changed=false;
+                        if(data.yx_delta){
+                            for(const idx in data.yx_delta){
+                                const i=parseInt(idx);
+                                if(!isNaN(i) && i>=0 && i<YX_COUNT){
+                                    yxValues[i]=data.yx_delta[i];
+                                    changed=true;
+                                }
+                            }
+                        }
+                        if(data.yc_delta){
+                            for(const idx in data.yc_delta){
+                                const i=parseInt(idx);
+                                if(!isNaN(i) && i>=0 && i<YC_COUNT){
+                                    ycValues[i]=data.yc_delta[i];
+                                    changed=true;
+                                }
+                            }
+                        }
+                        if(changed){
+                            renderParse();
+                            log('📊 增量数据已更新','log-data');
                         }
                     }
-                    if (data.response) {
-                        log(`📌 命令响应: ${data.response.message}`, 'log-data');
+
+                    // SOE
+                    if(data.soe && Array.isArray(data.soe)){
+                        for(const s of data.soe){
+                            const exists=soeEvents.some(e=>e.year===s.year && e.month===s.month && e.day===s.day && e.hour===s.hour && e.min===s.min && e.sec===s.sec && e.ms===s.ms && e.desc===s.desc);
+                            if(!exists) addSOE(s);
+                        }
                     }
-                } catch (e) {
-                    logErr('解析数据失败: ' + e.message);
+
+                    if(data.response){
+                        log(`📌 命令响应: ${data.response.message}`,'log-data');
+                    }
+                } catch(e){
+                    logErr('解析数据失败: '+e.message);
                 }
             });
 
-            mqttClient.on('error', (err) => {
-                logErr('MQTT 错误: ' + err.message);
-                showToast('MQTT 错误: ' + err.message, 'error');
+            mqttClient.on('error', (err)=>{
+                logErr('MQTT 错误: '+err.message);
+                showToast('MQTT 错误: '+err.message,'error');
             });
-            mqttClient.on('close', () => {
-                if (mqttConnected) { log('⚠️ MQTT 连接断开', 'log-warn'); updateMqttUI(false); }
+            mqttClient.on('close', ()=>{
+                if(mqttConnected){ log('⚠️ MQTT 连接断开','log-warn'); updateMqttUI(false); }
             });
-            mqttClient.on('offline', () => {
-                log('⚠️ MQTT 离线', 'log-warn'); updateMqttUI(false);
+            mqttClient.on('offline', ()=>{
+                log('⚠️ MQTT 离线','log-warn'); updateMqttUI(false);
             });
-        } catch (err) {
-            logErr('MQTT 连接失败: ' + err.message);
-            showToast('MQTT 连接失败: ' + err.message, 'error');
+        } catch(err){
+            logErr('MQTT 连接失败: '+err.message);
+            showToast('MQTT 连接失败: '+err.message,'error');
         }
     }
 
     function mqttDisconnect() {
-        if (mqttClient) {
-            mqttClient.end(true, () => {
-                log('🔌 MQTT 已断开', 'log-warn');
+        if(mqttClient){
+            mqttClient.end(true, ()=>{
+                log('🔌 MQTT 已断开','log-warn');
                 updateMqttUI(false);
-                mqttClient = null;
+                mqttClient=null;
             });
         } else {
             updateMqttUI(false);
@@ -530,53 +540,51 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
 
     // 发送命令
     function sendCommand(cmd) {
-        if (!mqttConnected || !mqttClient) {
-            showToast('请先连接MQTT', 'error');
+        if(!mqttConnected || !mqttClient){
+            showToast('请先连接MQTT','error');
             return;
         }
-        const topic = mqttSubTopic.value.trim();
-        if (!topic) { showToast('命令主题为空', 'error'); return; }
-        const payload = JSON.stringify({ cmd: cmd });
-        mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
-            if (err) logErr('发送命令失败: ' + err.message);
-            else log(`📤 发送命令: ${cmd}`, 'log-info');
+        const topic=mqttSubTopic.value.trim();
+        if(!topic){ showToast('命令主题为空','error'); return; }
+        const payload=JSON.stringify({ cmd:cmd });
+        mqttClient.publish(topic, payload, {qos:1}, (err)=>{
+            if(err) logErr('发送命令失败: '+err.message);
+            else log(`📤 发送命令: ${cmd}`,'log-info');
         });
     }
 
     // 快速遥控
-    function quickYk(onoff) {
-        sendCommand(onoff === 'on' ? 'yk_on' : 'yk_off');
-    }
+    function quickYk(onoff){ sendCommand(onoff==='on'?'yk_on':'yk_off'); }
 
     // 轮询控制
-    function applyPoll() {
-        const enabled = pollEnable.checked ? 1 : 0;
-        const interval = parseInt(pollInterval.value) || 1000;
-        sendCommand('set_poll_' + enabled + '_' + interval);
+    function applyPoll(){
+        const enabled=pollEnable.checked?1:0;
+        const interval=parseInt(pollInterval.value)||1000;
+        sendCommand('set_poll_'+enabled+'_'+interval);
     }
 
     // 事件绑定
     btnMqttConnect.addEventListener('click', mqttConnect);
     btnMqttDisconnect.addEventListener('click', mqttDisconnect);
 
-    btnSetTime.addEventListener('click', () => sendCommand('set_time'));
-    btnReset.addEventListener('click', () => sendCommand('reset'));
-    btnReadStatus.addEventListener('click', () => sendCommand('read_status'));
-    btnReadYC.addEventListener('click', () => sendCommand('read_yc'));
-    btnReadEnergy.addEventListener('click', () => sendCommand('read_energy'));
-    btnReadSOE.addEventListener('click', () => sendCommand('read_soe'));
+    btnSetTime.addEventListener('click', ()=>sendCommand('set_time'));
+    btnReset.addEventListener('click', ()=>sendCommand('reset'));
+    btnReadStatus.addEventListener('click', ()=>sendCommand('read_status'));
+    btnReadYC.addEventListener('click', ()=>sendCommand('read_yc'));
+    btnReadEnergy.addEventListener('click', ()=>sendCommand('read_energy'));
+    btnReadSOE.addEventListener('click', ()=>sendCommand('read_soe'));
 
-    btnYkOn.addEventListener('click', () => quickYk('on'));
-    btnYkOff.addEventListener('click', () => quickYk('off'));
+    btnYkOn.addEventListener('click', ()=>quickYk('on'));
+    btnYkOff.addEventListener('click', ()=>quickYk('off'));
 
     btnApplyPoll.addEventListener('click', applyPoll);
 
-    btnClearLog.addEventListener('click', () => { logArea.innerHTML = ''; });
+    btnClearLog.addEventListener('click', ()=>{ logArea.innerHTML=''; });
     btnClearSOE.addEventListener('click', clearSOE);
-    btnAutoScroll.addEventListener('click', () => {
-        autoScroll = !autoScroll;
-        btnAutoScroll.style.borderColor = autoScroll ? '#2ecc71' : '#aaa';
-        btnAutoScroll.style.color = autoScroll ? '#2ecc71' : '#888';
+    btnAutoScroll.addEventListener('click', ()=>{
+        autoScroll=!autoScroll;
+        btnAutoScroll.style.borderColor=autoScroll?'#2ecc71':'#aaa';
+        btnAutoScroll.style.color=autoScroll?'#2ecc71':'#888';
     });
     btnExportSOE.addEventListener('click', exportSOE);
     btnImportSOE.addEventListener('click', importSOE);
@@ -584,8 +592,9 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
     // 初始化
     renderParse();
     renderSOE();
-    log('📱 ST280G 远程监控（自动同步）已加载', 'log-info');
-    log('💡 连接MQTT后自动接收数据并同步点表名称', 'log-info');
+    log('📱 ST280G 远程监控（增量接收）已加载','log-info');
+    log('💡 每次打开页面自动生成新Client ID','log-info');
+    log('💡 支持完整数据和增量数据解析','log-info');
 
     window.__debug = { mqttConnect, mqttDisconnect, sendCommand };
 })();
