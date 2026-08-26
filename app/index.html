@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ST280G 远程监控 · 精简版</title>
+<title>ST280G 远程监控 · 自动同步</title>
 <script src="https://cdn.bootcdn.net/ajax/libs/mqtt/5.3.5/mqtt.min.js"></script>
 <style>
-/* 样式（与之前相同，保持布局） */
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Segoe UI','Microsoft YaHei',sans-serif; background:#f0f2f5; color:#1a1a2e; padding:20px; }
 .container { max-width:1500px; margin:0 auto; }
@@ -77,7 +76,7 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
 <div class="container">
     <!-- 顶栏 -->
     <div class="top-bar">
-        <div><h1>📱 ST280G 远程监控 <span class="subtitle">精简版</span></h1></div>
+        <div><h1>📱 ST280G 远程监控 <span class="subtitle">自动同步名称</span></h1></div>
         <div class="status-badge">
             <span class="status-dot disconnected" id="mqttStatusDot"></span>
             <span id="mqttStatusText">MQTT: 未连接</span>
@@ -184,270 +183,413 @@ h1 { font-size:24px; font-weight:600; display:flex; align-items:center; gap:12px
     </div>
 </div>
 <div class="toast" id="toast"></div>
+
 <script>
-    (function(){
-        'use strict';
+(function(){
+    'use strict';
 
-        // ---------- DOM ----------
-        const $ = id => document.getElementById(id);
-        const logArea = $('logArea'), parseContainer = $('parseContainer'), soeContainer = $('soeContainer');
-        const dataUpdateTime = $('dataUpdateTime'), soeCount = $('soeCount');
-        const mqttStatusDot = $('mqttStatusDot'), mqttStatusText = $('mqttStatusText');
+    // ---------- DOM ----------
+    const $ = id => document.getElementById(id);
+    const logArea = $('logArea'), parseContainer = $('parseContainer'), soeContainer = $('soeContainer');
+    const dataUpdateTime = $('dataUpdateTime'), soeCount = $('soeCount');
+    const mqttStatusDot = $('mqttStatusDot'), mqttStatusText = $('mqttStatusText');
 
-        const btnSetTime = $('btnSetTime'), btnReset = $('btnReset');
-        const btnReadStatus = $('btnReadStatus'), btnReadYC = $('btnReadYC'), btnReadEnergy = $('btnReadEnergy');
-        const btnReadSOE = $('btnReadSOE');
-        const btnYkOn = $('btnYkOn'), btnYkOff = $('btnYkOff');
-        const btnClearLog = $('btnClearLog'), btnClearSOE = $('btnClearSOE');
-        const btnAutoScroll = $('btnAutoScroll');
-        const btnExportSOE = $('btnExportSOE'), btnImportSOE = $('btnImportSOE');
-        const toast = $('toast');
-        const pollEnable = $('pollEnable'), pollInterval = $('pollInterval'), btnApplyPoll = $('btnApplyPoll');
+    const btnSetTime = $('btnSetTime'), btnReset = $('btnReset');
+    const btnReadStatus = $('btnReadStatus'), btnReadYC = $('btnReadYC'), btnReadEnergy = $('btnReadEnergy');
+    const btnReadSOE = $('btnReadSOE');
+    const btnYkOn = $('btnYkOn'), btnYkOff = $('btnYkOff');
+    const btnClearLog = $('btnClearLog'), btnClearSOE = $('btnClearSOE');
+    const btnAutoScroll = $('btnAutoScroll');
+    const btnExportSOE = $('btnExportSOE'), btnImportSOE = $('btnImportSOE');
+    const toast = $('toast');
+    const pollEnable = $('pollEnable'), pollInterval = $('pollInterval'), btnApplyPoll = $('btnApplyPoll');
 
-        // MQTT
-        const mqttBroker = $('mqttBroker'), mqttClientId = $('mqttClientId');
-        const mqttUsername = $('mqttUsername'), mqttPassword = $('mqttPassword');
-        const mqttPubTopic = $('mqttPubTopic'), mqttSubTopic = $('mqttSubTopic');
-        const btnMqttConnect = $('btnMqttConnect'), btnMqttDisconnect = $('btnMqttDisconnect');
-        const mqttStateLabel = $('mqttStateLabel');
+    // MQTT
+    const mqttBroker = $('mqttBroker'), mqttClientId = $('mqttClientId');
+    const mqttUsername = $('mqttUsername'), mqttPassword = $('mqttPassword');
+    const mqttPubTopic = $('mqttPubTopic'), mqttSubTopic = $('mqttSubTopic');
+    const btnMqttConnect = $('btnMqttConnect'), btnMqttDisconnect = $('btnMqttDisconnect');
+    const mqttStateLabel = $('mqttStateLabel');
 
-        // 常量
-        const YX_COUNT = 64, YC_COUNT = 26;
-        const DEFAULT_YX_NAMES = Array.from({length:YX_COUNT},(_,i)=>`YX${i+1}`);
-        const DEFAULT_YC_NAMES = Array.from({length:YC_COUNT},(_,i)=>`YC${i+1}`);
+    // 常量
+    const YX_COUNT = 64, YC_COUNT = 26;
+    const DEFAULT_YX_NAMES = Array.from({length:YX_COUNT},(_,i)=>`YX${i+1}`);
+    const DEFAULT_YC_NAMES = Array.from({length:YC_COUNT},(_,i)=>`YC${i+1}`);
 
-        function loadNames() {
-            let stored;
-            try { stored = JSON.parse(localStorage.getItem('st280g_point_names')); } catch(e) { stored = null; }
-            if (stored && stored.yx && stored.yx.length===YX_COUNT && stored.yc && stored.yc.length===YC_COUNT) return stored;
-            return { yx:[...DEFAULT_YX_NAMES], yc:[...DEFAULT_YC_NAMES] };
+    let pointNames = { yx:[...DEFAULT_YX_NAMES], yc:[...DEFAULT_YC_NAMES] };
+
+    function loadNames() {
+        let stored;
+        try { stored = JSON.parse(localStorage.getItem('st280g_point_names')); } catch(e) { stored = null; }
+        if (stored && stored.yx && stored.yx.length===YX_COUNT && stored.yc && stored.yc.length===YC_COUNT) {
+            pointNames = stored;
+        } else {
+            pointNames.yx = [...DEFAULT_YX_NAMES];
+            pointNames.yc = [...DEFAULT_YC_NAMES];
+            saveNamesToStorage();
         }
-        let pointNames = loadNames();
+    }
+    function saveNamesToStorage() {
+        localStorage.setItem('st280g_point_names', JSON.stringify({ yx:pointNames.yx, yc:pointNames.yc }));
+    }
+    loadNames();
 
-        const COEFS = [0.000610,0.000610,0.000610,0.000610,0.000610,0.000610,
-                       0.030500,0.030500,0.030500,
-                       0.305200,0.305200,0.305200,
-                       0.305200,0.610400,0.003050,
-                       1.220000,1.220000,1.220000,
-                       0.000980,0.010000];
+    const COEFS = [0.000610,0.000610,0.000610,0.000610,0.000610,0.000610,
+                   0.030500,0.030500,0.030500,
+                   0.305200,0.305200,0.305200,
+                   0.305200,0.610400,0.003050,
+                   1.220000,1.220000,1.220000,
+                   0.000980,0.010000];
 
-        const EVENT_NAMES = { /* 完整事件定义，与之前相同，为节省篇幅此处省略，实际代码必须包含 */ };
-        const EVENT_MAP = { /* 同上 */ };
+    // 状态
+    let autoScroll = true;
+    let yxValues = new Array(YX_COUNT).fill(0);
+    let ycValues = new Array(YC_COUNT).fill(0);
+    let soeEvents = [];
+    const MAX_SOE = 500;
+    let mqttClient = null;
+    let mqttConnected = false;
 
-        // 状态
-        let autoScroll = true;
-        let yxValues = new Array(YX_COUNT).fill(0);
-        let ycValues = new Array(YC_COUNT).fill(0);
-        let soeEvents = [];
-        const MAX_SOE = 500;
-        let mqttClient = null;
-        let mqttConnected = false;
+    // 工具
+    function generateClientId() {
+        return 'st280g_remote_' + Math.random().toString(16).substring(2, 10);
+    }
+    if (!mqttClientId.value || mqttClientId.value === 'st280g_remote_xxxx') {
+        mqttClientId.value = generateClientId();
+    }
 
-        // 工具
-        function generateClientId() {
-            return 'st280g_remote_' + Math.random().toString(16).substring(2, 10);
+    // Toast
+    let toastTimer=null;
+    function showToast(msg, type='info') {
+        toast.textContent=msg;
+        toast.className='toast '+type+' show';
+        clearTimeout(toastTimer);
+        toastTimer=setTimeout(()=>{ toast.className='toast'; }, 3000);
+    }
+
+    // 日志
+    function log(msg, cls='log-info') {
+        const time=new Date().toLocaleTimeString();
+        const line=document.createElement('div');
+        line.innerHTML = `<span class="log-time">[${time}]</span> <span class="${cls}">${msg}</span>`;
+        logArea.appendChild(line);
+        if(autoScroll) logArea.scrollTop=logArea.scrollHeight;
+    }
+    function logWarn(msg){ log('⚠️ '+msg,'log-warn'); }
+    function logErr(msg){ log('❌ '+msg,'log-err'); }
+    function logData(msg){ log('📊 '+msg,'log-data'); }
+
+    // 渲染
+    function renderParse() {
+        let html='<div class="parse-grid">';
+        for(let i=0;i<YX_COUNT;i++){
+            const val=yxValues[i]||0;
+            const cls=val?'yx-on':'yx-off';
+            const name=pointNames.yx[i]||`YX${i+1}`;
+            const display=val?'● 合':'○ 分';
+            html+=`<div class="parse-item ${cls}"><span class="label" title="${name}">${name}</span><span class="value">${display}</span></div>`;
         }
-        if (!mqttClientId.value || mqttClientId.value === 'st280g_remote_xxxx') {
-            mqttClientId.value = generateClientId();
+        for(let i=0;i<YC_COUNT;i++){
+            const val=ycValues[i]||0;
+            const name=pointNames.yc[i]||`YC${i+1}`;
+            let display=val.toFixed(3);
+            if(i>=20) display=val.toFixed(2);
+            html+=`<div class="parse-item yc"><span class="label" title="${name}">${name}</span><span class="value">${display}</span></div>`;
         }
+        html+='</div>';
+        parseContainer.innerHTML=html;
+        dataUpdateTime.textContent=new Date().toLocaleTimeString();
+    }
 
-        // Toast
-        let toastTimer=null;
-        function showToast(msg, type='info') {
-            toast.textContent=msg;
-            toast.className='toast '+type+' show';
-            clearTimeout(toastTimer);
-            toastTimer=setTimeout(()=>{ toast.className='toast'; }, 3000);
+    function formatSOETime(soe) {
+        return `${soe.year}-${String(soe.month).padStart(2,'0')}-${String(soe.day).padStart(2,'0')} ` +
+               `${String(soe.hour).padStart(2,'0')}:${String(soe.min).padStart(2,'0')}:${String(soe.sec).padStart(2,'0')}.${String(soe.ms).padStart(3,'0')}`;
+    }
+
+    function renderSOE() {
+        if (soeEvents.length === 0) {
+            soeContainer.innerHTML = '<div class="empty-hint">暂无事件</div>';
+            soeCount.textContent = '(0)';
+            return;
         }
-
-        // 日志
-        function log(msg, cls='log-info') {
-            const time=new Date().toLocaleTimeString();
-            const line=document.createElement('div');
-            line.innerHTML = `<span class="log-time">[${time}]</span> <span class="${cls}">${msg}</span>`;
-            logArea.appendChild(line);
-            if(autoScroll) logArea.scrollTop=logArea.scrollHeight;
+        let html = '';
+        for (const soe of soeEvents) {
+            const timeStr = formatSOETime(soe);
+            const yxLabel = (soe.yx_index >= 0 && soe.yx_index < YX_COUNT) ? 
+                (pointNames.yx[soe.yx_index] || `YX${soe.yx_index+1}`) : '—';
+            const yxVal = soe.yx_value ? '合' : '分';
+            const idxDisplay = (soe.yx_index >= 0 && soe.yx_index < YX_COUNT) ? `#${soe.yx_index+1}` : '';
+            html += `<div class="soe-item">
+                <span><span class="time">${timeStr}</span> &nbsp;|&nbsp; <span class="desc">${soe.desc||'未知事件'}</span></span>
+                <span><span class="yx">${yxLabel} → ${yxVal}</span> <span class="idx-badge">${idxDisplay}</span></span>
+            </div>`;
         }
-        function logWarn(msg){ log('⚠️ '+msg,'log-warn'); }
-        function logErr(msg){ log('❌ '+msg,'log-err'); }
-        function logData(msg){ log('📊 '+msg,'log-data'); }
+        soeContainer.innerHTML = html;
+        soeCount.textContent = `(${soeEvents.length})`;
+    }
 
-        // 渲染函数（与之前相同，此处省略，实际代码需包含）
-        function renderParse() { /* ... */ }
-        function renderSOE() { /* ... */ }
-        function addSOE(soe) { /* ... */ }
-        function clearSOE() { /* ... */ }
-        function exportSOE() { /* ... */ }
-        function importSOE() { /* ... */ }
-
-        // MQTT
-        function updateMqttUI(connected) {
-            mqttConnected = connected;
-            btnMqttConnect.disabled = connected;
-            btnMqttDisconnect.disabled = !connected;
-            mqttStateLabel.textContent = connected ? '已连接' : '未连接';
-            mqttStatusDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
-            mqttStatusText.textContent = 'MQTT: ' + (connected ? '已连接' : '未连接');
-        }
-
-        async function mqttConnect() {
-            if (mqttConnected) return;
-            const broker = mqttBroker.value.trim();
-            if (!broker) { showToast('请输入MQTT服务器地址', 'error'); return; }
-            const clientId = mqttClientId.value.trim() || generateClientId();
-            const username = mqttUsername.value.trim() || undefined;
-            const password = mqttPassword.value.trim() || undefined;
-
-            try {
-                const options = {
-                    clientId: clientId,
-                    username: username,
-                    password: password,
-                    clean: true,
-                    reconnectPeriod: 1000,
-                    connectTimeout: 30 * 1000,
-                    will: { topic: mqttPubTopic.value, payload: 'offline', qos: 0, retain: false }
-                };
-                mqttClient = mqtt.connect(broker, options);
-
-                mqttClient.on('connect', () => {
-                    log('✅ MQTT 连接成功', 'log-info');
-                    showToast('MQTT 已连接', 'success');
-                    updateMqttUI(true);
-                    // 订阅数据主题
-                    const dataTopic = mqttPubTopic.value.trim();
-                    if (dataTopic) {
-                        mqttClient.subscribe(dataTopic, { qos: 1 }, (err) => {
-                            if (err) logErr('订阅数据主题失败: ' + err.message);
-                            else log(`📡 已订阅数据主题: ${dataTopic}`, 'log-info');
-                        });
-                    }
-                    // 订阅命令主题（用于接收响应）
-                    const subTopic = mqttSubTopic.value.trim();
-                    if (subTopic) {
-                        mqttClient.subscribe(subTopic, { qos: 1 }, (err) => {
-                            if (err) logErr('订阅命令主题失败: ' + err.message);
-                            else log(`📡 已订阅命令主题: ${subTopic}`, 'log-info');
-                        });
-                    }
-                });
-
-                mqttClient.on('message', (topic, message) => {
-                    const payload = message.toString();
-                    log(`📨 收到消息 (${topic})`, 'log-info');
-                    try {
-                        const data = JSON.parse(payload);
-                        if (data.yx && data.yx.length === YX_COUNT) {
-                            yxValues = data.yx.slice();
-                            renderParse();
-                        }
-                        if (data.yc && data.yc.length === YC_COUNT) {
-                            ycValues = data.yc.slice();
-                            renderParse();
-                        }
-                        if (data.soe && Array.isArray(data.soe)) {
-                            for (const s of data.soe) {
-                                const exists = soeEvents.some(e => e.year===s.year && e.month===s.month && e.day===s.day && e.hour===s.hour && e.min===s.min && e.sec===s.sec && e.ms===s.ms && e.desc===s.desc);
-                                if (!exists) addSOE(s);
-                            }
-                        }
-                        if (data.response) {
-                            log(`📌 命令响应: ${data.response.message}`, 'log-data');
-                        }
-                    } catch (e) {
-                        logErr('解析数据失败: ' + e.message);
-                    }
-                });
-
-                mqttClient.on('error', (err) => {
-                    logErr('MQTT 错误: ' + err.message);
-                    showToast('MQTT 错误: ' + err.message, 'error');
-                });
-                mqttClient.on('close', () => {
-                    if (mqttConnected) { log('⚠️ MQTT 连接断开', 'log-warn'); updateMqttUI(false); }
-                });
-                mqttClient.on('offline', () => {
-                    log('⚠️ MQTT 离线', 'log-warn'); updateMqttUI(false);
-                });
-            } catch (err) {
-                logErr('MQTT 连接失败: ' + err.message);
-                showToast('MQTT 连接失败: ' + err.message, 'error');
-            }
-        }
-
-        function mqttDisconnect() {
-            if (mqttClient) {
-                mqttClient.end(true, () => {
-                    log('🔌 MQTT 已断开', 'log-warn');
-                    updateMqttUI(false);
-                    mqttClient = null;
-                });
-            } else {
-                updateMqttUI(false);
-            }
-        }
-
-        // 发送命令
-        function sendCommand(cmd) {
-            if (!mqttConnected || !mqttClient) {
-                showToast('请先连接MQTT', 'error');
-                return;
-            }
-            const topic = mqttSubTopic.value.trim();
-            if (!topic) { showToast('命令主题为空', 'error'); return; }
-            const payload = JSON.stringify({ cmd: cmd });
-            mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
-                if (err) logErr('发送命令失败: ' + err.message);
-                else log(`📤 发送命令: ${cmd}`, 'log-info');
-            });
-        }
-
-        // 快速遥控
-        function quickYk(onoff) {
-            sendCommand(onoff === 'on' ? 'yk_on' : 'yk_off');
-        }
-
-        // 轮询控制
-        function applyPoll() {
-            const enabled = pollEnable.checked ? 1 : 0;
-            const interval = parseInt(pollInterval.value) || 1000;
-            sendCommand('set_poll_' + enabled + '_' + interval);
-        }
-
-        // 事件绑定
-        btnMqttConnect.addEventListener('click', mqttConnect);
-        btnMqttDisconnect.addEventListener('click', mqttDisconnect);
-
-        btnSetTime.addEventListener('click', () => sendCommand('set_time'));
-        btnReset.addEventListener('click', () => sendCommand('reset'));
-        btnReadStatus.addEventListener('click', () => sendCommand('read_status'));
-        btnReadYC.addEventListener('click', () => sendCommand('read_yc'));
-        btnReadEnergy.addEventListener('click', () => sendCommand('read_energy'));
-        btnReadSOE.addEventListener('click', () => sendCommand('read_soe'));
-
-        btnYkOn.addEventListener('click', () => quickYk('on'));
-        btnYkOff.addEventListener('click', () => quickYk('off'));
-
-        btnApplyPoll.addEventListener('click', applyPoll);
-
-        btnClearLog.addEventListener('click', () => { logArea.innerHTML = ''; });
-        btnClearSOE.addEventListener('click', clearSOE);
-        btnAutoScroll.addEventListener('click', () => {
-            autoScroll = !autoScroll;
-            btnAutoScroll.style.borderColor = autoScroll ? '#2ecc71' : '#aaa';
-            btnAutoScroll.style.color = autoScroll ? '#2ecc71' : '#888';
-        });
-        btnExportSOE.addEventListener('click', exportSOE);
-        btnImportSOE.addEventListener('click', importSOE);
-
-        // 初始化
-        renderParse();
+    function addSOE(soe) {
+        soeEvents.unshift(soe);
+        if (soeEvents.length > MAX_SOE) soeEvents = soeEvents.slice(0, MAX_SOE);
         renderSOE();
-        log('📱 ST280G 精简远程监控已加载', 'log-info');
-        log('💡 支持轮询控制和快速遥控', 'log-info');
+    }
 
-        window.__debug = { mqttConnect, mqttDisconnect, sendCommand };
-    })();
+    function clearSOE() {
+        soeEvents = [];
+        renderSOE();
+        log('🗑️ SOE事件已清空', 'log-info');
+        showToast('SOE事件已清空', 'info');
+    }
+
+    function exportSOE() {
+        if (soeEvents.length === 0) { showToast('没有SOE事件可导出', 'error'); return; }
+        const lines = ['# ST280G SOE 事件导出'];
+        const now = new Date();
+        lines.push(`# 导出时间: ${now.toISOString()}`);
+        lines.push(`# 事件总数: ${soeEvents.length}`);
+        lines.push('# 格式: 时间 | 事件描述 | YX编号(1-based) | 状态(合/分)');
+        for (const soe of soeEvents) {
+            const timeStr = formatSOETime(soe);
+            const desc = soe.desc || '未知事件';
+            const yxNum = (soe.yx_index >= 0 && soe.yx_index < YX_COUNT) ? (soe.yx_index + 1) : 0;
+            const status = soe.yx_value ? '合' : '分';
+            lines.push(`${timeStr} | ${desc} | ${yxNum} | ${status}`);
+        }
+        const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SOE_${now.toISOString().slice(0,10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`导出 ${soeEvents.length} 条SOE事件成功`, 'success');
+    }
+
+    function importSOE() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,.csv';
+        input.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const content = ev.target.result;
+                    const lines = content.split(/\r?\n/);
+                    let count = 0, skipped = 0, imported = [];
+                    for (let line of lines) {
+                        line = line.trim();
+                        if (!line || line.startsWith('#')) continue;
+                        const parts = line.split('|').map(s => s.trim());
+                        if (parts.length < 4) { skipped++; continue; }
+                        const [timeStr, desc, yxNumStr, statusStr] = parts;
+                        const timeMatch = timeStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/);
+                        if (!timeMatch) { skipped++; continue; }
+                        const [, year, month, day, hour, min, sec, ms] = timeMatch.map(Number);
+                        let yxIndex = parseInt(yxNumStr) - 1;
+                        if (isNaN(yxIndex) || yxIndex < 0) yxIndex = -1;
+                        if (yxIndex >= YX_COUNT) yxIndex = YX_COUNT - 1;
+                        const yxValue = (statusStr === '合' || statusStr === '1' || statusStr === 'ON') ? 1 : 0;
+                        const soe = { year, month, day, hour, min, sec, ms, yx_index: yxIndex, yx_value: yxValue, desc: desc || '未知事件' };
+                        imported.push(soe);
+                        count++;
+                    }
+                    if (count === 0) { showToast('未解析到有效SOE事件', 'error'); return; }
+                    for (const soe of imported) addSOE(soe);
+                    renderSOE();
+                    showToast(`成功导入 ${count} 条SOE事件${skipped > 0 ? `，跳过 ${skipped} 行` : ''}`, 'success');
+                } catch (err) {
+                    showToast('导入失败: ' + err.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    // MQTT
+    function updateMqttUI(connected) {
+        mqttConnected = connected;
+        btnMqttConnect.disabled = connected;
+        btnMqttDisconnect.disabled = !connected;
+        mqttStateLabel.textContent = connected ? '已连接' : '未连接';
+        mqttStatusDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+        mqttStatusText.textContent = 'MQTT: ' + (connected ? '已连接' : '未连接');
+    }
+
+    async function mqttConnect() {
+        if (mqttConnected) return;
+        const broker = mqttBroker.value.trim();
+        if (!broker) { showToast('请输入MQTT服务器地址', 'error'); return; }
+        const clientId = mqttClientId.value.trim() || generateClientId();
+        const username = mqttUsername.value.trim() || undefined;
+        const password = mqttPassword.value.trim() || undefined;
+
+        try {
+            const options = {
+                clientId: clientId,
+                username: username,
+                password: password,
+                clean: true,
+                reconnectPeriod: 1000,
+                connectTimeout: 30 * 1000,
+                will: { topic: mqttPubTopic.value, payload: 'offline', qos: 0, retain: false }
+            };
+            mqttClient = mqtt.connect(broker, options);
+
+            mqttClient.on('connect', () => {
+                log('✅ MQTT 连接成功', 'log-info');
+                showToast('MQTT 已连接', 'success');
+                updateMqttUI(true);
+                // 订阅数据主题
+                const dataTopic = mqttPubTopic.value.trim();
+                if (dataTopic) {
+                    mqttClient.subscribe(dataTopic, { qos: 1 }, (err) => {
+                        if (err) logErr('订阅数据主题失败: ' + err.message);
+                        else log(`📡 已订阅数据主题: ${dataTopic}`, 'log-info');
+                    });
+                }
+                // 订阅命令主题（用于接收响应）
+                const subTopic = mqttSubTopic.value.trim();
+                if (subTopic) {
+                    mqttClient.subscribe(subTopic, { qos: 1 }, (err) => {
+                        if (err) logErr('订阅命令主题失败: ' + err.message);
+                        else log(`📡 已订阅命令主题: ${subTopic}`, 'log-info');
+                    });
+                }
+            });
+
+            mqttClient.on('message', (topic, message) => {
+                const payload = message.toString();
+                log(`📨 收到消息 (${topic})`, 'log-info');
+                try {
+                    const data = JSON.parse(payload);
+                    // ===== 新增：自动同步点表名称 =====
+                    if (data.yx_names && data.yx_names.length === YX_COUNT) {
+                        pointNames.yx = data.yx_names;
+                        saveNamesToStorage();
+                        log('📝 遥信名称已同步', 'log-data');
+                    }
+                    if (data.yc_names && data.yc_names.length === YC_COUNT) {
+                        pointNames.yc = data.yc_names;
+                        saveNamesToStorage();
+                        log('📝 遥测名称已同步', 'log-data');
+                    }
+                    // 更新数据
+                    if (data.yx && data.yx.length === YX_COUNT) {
+                        yxValues = data.yx.slice();
+                        renderParse();
+                    }
+                    if (data.yc && data.yc.length === YC_COUNT) {
+                        ycValues = data.yc.slice();
+                        renderParse();
+                    }
+                    if (data.soe && Array.isArray(data.soe)) {
+                        for (const s of data.soe) {
+                            const exists = soeEvents.some(e => e.year===s.year && e.month===s.month && e.day===s.day && e.hour===s.hour && e.min===s.min && e.sec===s.sec && e.ms===s.ms && e.desc===s.desc);
+                            if (!exists) addSOE(s);
+                        }
+                    }
+                    if (data.response) {
+                        log(`📌 命令响应: ${data.response.message}`, 'log-data');
+                    }
+                } catch (e) {
+                    logErr('解析数据失败: ' + e.message);
+                }
+            });
+
+            mqttClient.on('error', (err) => {
+                logErr('MQTT 错误: ' + err.message);
+                showToast('MQTT 错误: ' + err.message, 'error');
+            });
+            mqttClient.on('close', () => {
+                if (mqttConnected) { log('⚠️ MQTT 连接断开', 'log-warn'); updateMqttUI(false); }
+            });
+            mqttClient.on('offline', () => {
+                log('⚠️ MQTT 离线', 'log-warn'); updateMqttUI(false);
+            });
+        } catch (err) {
+            logErr('MQTT 连接失败: ' + err.message);
+            showToast('MQTT 连接失败: ' + err.message, 'error');
+        }
+    }
+
+    function mqttDisconnect() {
+        if (mqttClient) {
+            mqttClient.end(true, () => {
+                log('🔌 MQTT 已断开', 'log-warn');
+                updateMqttUI(false);
+                mqttClient = null;
+            });
+        } else {
+            updateMqttUI(false);
+        }
+    }
+
+    // 发送命令
+    function sendCommand(cmd) {
+        if (!mqttConnected || !mqttClient) {
+            showToast('请先连接MQTT', 'error');
+            return;
+        }
+        const topic = mqttSubTopic.value.trim();
+        if (!topic) { showToast('命令主题为空', 'error'); return; }
+        const payload = JSON.stringify({ cmd: cmd });
+        mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
+            if (err) logErr('发送命令失败: ' + err.message);
+            else log(`📤 发送命令: ${cmd}`, 'log-info');
+        });
+    }
+
+    // 快速遥控
+    function quickYk(onoff) {
+        sendCommand(onoff === 'on' ? 'yk_on' : 'yk_off');
+    }
+
+    // 轮询控制
+    function applyPoll() {
+        const enabled = pollEnable.checked ? 1 : 0;
+        const interval = parseInt(pollInterval.value) || 1000;
+        sendCommand('set_poll_' + enabled + '_' + interval);
+    }
+
+    // 事件绑定
+    btnMqttConnect.addEventListener('click', mqttConnect);
+    btnMqttDisconnect.addEventListener('click', mqttDisconnect);
+
+    btnSetTime.addEventListener('click', () => sendCommand('set_time'));
+    btnReset.addEventListener('click', () => sendCommand('reset'));
+    btnReadStatus.addEventListener('click', () => sendCommand('read_status'));
+    btnReadYC.addEventListener('click', () => sendCommand('read_yc'));
+    btnReadEnergy.addEventListener('click', () => sendCommand('read_energy'));
+    btnReadSOE.addEventListener('click', () => sendCommand('read_soe'));
+
+    btnYkOn.addEventListener('click', () => quickYk('on'));
+    btnYkOff.addEventListener('click', () => quickYk('off'));
+
+    btnApplyPoll.addEventListener('click', applyPoll);
+
+    btnClearLog.addEventListener('click', () => { logArea.innerHTML = ''; });
+    btnClearSOE.addEventListener('click', clearSOE);
+    btnAutoScroll.addEventListener('click', () => {
+        autoScroll = !autoScroll;
+        btnAutoScroll.style.borderColor = autoScroll ? '#2ecc71' : '#aaa';
+        btnAutoScroll.style.color = autoScroll ? '#2ecc71' : '#888';
+    });
+    btnExportSOE.addEventListener('click', exportSOE);
+    btnImportSOE.addEventListener('click', importSOE);
+
+    // 初始化
+    renderParse();
+    renderSOE();
+    log('📱 ST280G 远程监控（自动同步名称）已加载', 'log-info');
+    log('💡 连接MQTT后自动接收数据并同步点表名称', 'log-info');
+
+    window.__debug = { mqttConnect, mqttDisconnect, sendCommand };
+})();
 </script>
 </body>
 </html>
